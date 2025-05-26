@@ -192,6 +192,8 @@
         <div class="controls">
             Use LEFT/RIGHT arrows to rotate<br>
             SPACE to shoot<br>
+            <strong>Maximum 3 bullets at once!</strong><br>
+            Wait for bullets to hit or leave before shooting again<br>
             Defend your castle from the monsters!
         </div>
     </div>
@@ -574,8 +576,8 @@
                 gameState.beamAngle += rotationSpeed * deltaTime;
             }
             
-            // Shoot bullets (only if game not over)
-            if (!gameState.gameOver && keys.Space && !keys.spacePressed) {
+            // Shoot bullets (only if game not over and bullet limit not reached)
+            if (!gameState.gameOver && keys.Space && !keys.spacePressed && gameState.bullets.length <= 2) {
                 gameState.bullets.push(new Bullet(gameState.beamAngle));
                 keys.spacePressed = true;
             }
