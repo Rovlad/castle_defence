@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Castle Defense: Night Siege</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a0a0a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 800px;
+            overflow: visible; /* Changed from hidden to visible */
+        }
+        
+        #gameCanvas {
+            background: #000;
+            border: 3px solid #333;
+            border-radius: 50%;
+            cursor: crosshair;
+        }
+        
+        #ui-left {
+            position: absolute;
+            top: 20px;
+            left: -180px;
+            color: #fff;
+            font-size: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        
+        #ui-right {
+            position: absolute;
+            top: 20px;
+            right: -180px;
+            color: #fff;
+            font-size: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            text-align: right;
+        }
+        
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff0000;
+            font-size: 48px;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            text-align: center;
+            font-size: 16px;
+            opacity: 0.8;
+        }
+        
+        #startScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        #startScreen h1 {
+            color: #fff;
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+        }
+        
+        #startScreen p {
+            color: #fff;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        
+        #startScreen .controls {
+            color: #fff;
+            font-size: 18px;
+            line-height: 1.8;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+        
+        #nameEntry {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+            z-index: 20;
+        }
+        
+        #nameEntry h2 {
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        
+        #nameEntry input {
+            padding: 10px;
+            font-size: 18px;
+            width: 200px;
+            margin-bottom: 20px;
+        }
+        
+        #nameEntry button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        #nameEntry button:hover {
+            background: #45a049;
+        }
+        
+        #scoreDisplay {
+            color: #fff;
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="800"></canvas>
+        <div id="ui-left">
+            <div>Level: <span id="level">1</span></div>
+            <div>Time to Next Level: <span id="timer">60</span>s</div>
+        </div>
+        <div id="ui-right">
+            <div>Monsters Attacking: <span id="attacking">0</span></div>
+            <div>Monsters Killed: <span id="kills">0</span></div>
+        </div>
+        <div id="gameOver">
+            GAME OVER!<br>
+            <span style="font-size: 24px">Do you want to record your result Y/N?</span>
+        </div>
+        <div id="instructions">
+            Use LEFT/RIGHT arrows to rotate • SPACE to shoot
+        </div>
+        <div id="nameEntry">
+            <h2>Game Over!</h2>
+            <div id="scoreDisplay"></div>
+            <p style="color: #fff; margin-top: 20px;">Enter your name to save your score:</p>
+            <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+            <br>
+            <button onclick="saveScore()">Save Score</button>
+            <button onclick="skipScore()" style="background: #666; margin-left: 10px;">Skip</button>
+        </div>
+    </div>
+
+    <div id="startScreen">
+        <h1>Castle Defense: Night Siege</h1>
+        <p>Press Enter to start</p>
+        <div class="controls">
+            Use LEFT/RIGHT arrows to rotate<br>
+            SPACE to shoot<br>
+            Defend your castle from the monsters!
+        </div>
+    </div>
+
+    <script>
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const gameRadius = 380;
+            const castleRadius = 60;
+        
+        let gameState = {
+            level: 1,
+            kills: 0,
+            levelTimer: 60,
+            monsterSpawnTimer: 10,
+            monsterSpawnInterval: 10,
+            gameOver: false,
+            gameStarted: false,
+            beamAngle: -Math.PI / 2,
+            beamWidth: Math.PI / 6,
+            monsters: [],
+            bullets: [],
+            bouncingBullets: [],
+            lastSpawnTime: Date.now(),
+            lastLevelTime: Date.now(),
+            monsterCount: 0,
+            gameStartTime: Date.now(),
+            highScores: [],
+            blinkingPhase: false,
+            blinkStartTime: 0,
+            showGameOverOptions: false
+        };
+        
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            Space: false
+        };
+        
+        class Monster {
+            constructor() {
+                const angle = Math.random() * 2 * Math.PI;
+                this.x = centerX + Math.cos(angle) * gameRadius;
+                this.y = centerY + Math.sin(angle) * gameRadius;
+                this.speed = 0.3 + (gameState.level - 1) * 0.1;
+                this.radius = 15;
+                
+                // Determine monster type based on level and spawn count
+                gameState.monsterCount = (gameState.monsterCount || 0) + 1;
+                
+                if (gameState.level >= 7 && gameState.monsterCount % 3 === 0) {
+                    // Every third monster from level 7 has 3 HP
+                    this.hp = 3;
+                    this.monsterType = 'heavy';
+                } else if (gameState.level >= 5 && gameState.monsterCount % 2 === 0) {
+                    // Every second monster from level 5 has 2 HP
+                    this.hp = 2;
+                    this.monsterType = 'armored';
+                } else {
+                    this.hp = 1;
+                    this.monsterType = 'normal';
+                }
+                
+                this.maxHp = this.hp;
+                this.visible = false;
+                this.atCastle = false;
+                
+                // For curved movement (level 3+)
+                this.curveOffset = 0;
+                this.curveDirection = Math.random() > 0.5 ? 1 : -1;
+                this.curveIntensity = 0.02 + Math.random() * 0.03;
+                this.timeSinceDirectionChange = 0;
+                this.directionChangeInterval = 60 + Math.random() * 60;
+                
+                // For hit animation
+                this.hitFlash = 0;
+            }
+            
+            update() {
+                const dx = centerX - this.x;
+                const dy = centerY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Check if reached castle BEFORE moving
+                if (dist < castleRadius + this.radius) {
+                    this.visible = true; // Make monster visible when it reaches castle
+                    this.atCastle = true; // Mark that this monster breached the castle
+                    
+                    if (!gameState.blinkingPhase) {
+                        // Start blinking phase
+                        gameState.blinkingPhase = true;
+                        gameState.blinkStartTime = Date.now();
+                    }
+                    
+                    return true; // Keep the monster in the array so it can be drawn
+                }
+                
+                // Calculate base movement toward castle
+                let moveX = (dx / dist) * this.speed;
+                let moveY = (dy / dist) * this.speed;
+                
+                // Apply curved movement for level 3+
+                if (gameState.level >= 3) {
+                    // Update curve timing
+                    this.timeSinceDirectionChange++;
+                    
+                    // Randomly change curve direction
+                    if (this.timeSinceDirectionChange > this.directionChangeInterval) {
+                        this.curveDirection *= -1;
+                        this.timeSinceDirectionChange = 0;
+                        this.directionChangeInterval = 60 + Math.random() * 60;
+                    }
+                    
+                    // Calculate perpendicular vector for sideways movement
+                    const perpX = -dy / dist;
+                    const perpY = dx / dist;
+                    
+                    // Add curved movement
+                    const curveAmount = Math.sin(this.curveOffset) * this.curveDirection * 0.5;
+                    moveX += perpX * curveAmount * this.speed;
+                    moveY += perpY * curveAmount * this.speed;
+                    
+                    this.curveOffset += this.curveIntensity;
+                }
+                
+                // Apply movement
+                this.x += moveX;
+                this.y += moveY;
+                
+                // Check if in light beam
+                const monsterAngle = Math.atan2(this.y - centerY, this.x - centerX);
+                let angleDiff = monsterAngle - gameState.beamAngle;
+                
+                // Normalize angle difference to [-PI, PI]
+                while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+                
+                this.visible = Math.abs(angleDiff) < gameState.beamWidth / 2;
+                
+                return true;
+            }
+            
+            draw() {
+                // Always draw if visible
+                if (this.visible) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.9;
+                    
+                    // Determine color based on monster type and state
+                    if (this.atCastle && (gameState.blinkingPhase || gameState.gameOver)) {
+                        // Blink bright red for the monster that breached
+                        const blinkPhase = Math.floor(Date.now() / 200) % 2;
+                        ctx.fillStyle = blinkPhase ? '#ff0000' : '#ffff00';
+                    } else if (this.hitFlash > 0) {
+                        // Flash white when hit
+                        ctx.fillStyle = '#ffffff';
+                        this.hitFlash--;
+                    } else if (this.monsterType === 'heavy') {
+                        // Heavy armored monsters (3 HP) - Green shades
+                        if (this.hp === 3) {
+                            ctx.fillStyle = '#006400'; // Dark green
+                        } else if (this.hp === 2) {
+                            ctx.fillStyle = '#228b22'; // Forest green
+                        } else {
+                            ctx.fillStyle = '#90ee90'; // Light green
+                        }
+                    } else if (this.monsterType === 'armored') {
+                        // Armored monsters (2 HP) - Purple shades
+                        ctx.fillStyle = this.hp === 2 ? '#4b0082' : '#9370db';
+                    } else {
+                        // Normal monsters - Red shades
+                        ctx.fillStyle = this.hp === 1 ? '#8b0000' : '#cd5c5c';
+                    }
+                    
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    // Monster eyes - different colors for different types
+                    if (this.monsterType === 'heavy') {
+                        ctx.fillStyle = '#00ff00'; // Bright green eyes
+                    } else if (this.monsterType === 'armored') {
+                        ctx.fillStyle = '#ffff00'; // Yellow eyes
+                    } else {
+                        ctx.fillStyle = '#ff0000'; // Red eyes
+                    }
+                    
+                    ctx.beginPath();
+                    ctx.arc(this.x - 5, this.y - 3, 3, 0, 2 * Math.PI);
+                    ctx.arc(this.x + 5, this.y - 3, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    // Show HP indicator for multi-hit monsters
+                    if ((this.monsterType === 'armored' || this.monsterType === 'heavy') && this.hp > 0 && !this.atCastle) {
+                        const hpColor = this.hp === this.maxHp ? '#00ff00' : 
+                                       this.hp === 2 ? '#ffff00' : '#ff0000';
+                        ctx.fillStyle = hpColor;
+                        ctx.fillRect(this.x - 10, this.y - 20, 20 * (this.hp / this.maxHp), 3);
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(this.x - 10, this.y - 20, 20, 3);
+                    }
+                    
+                    ctx.restore();
+                }
+            }
+        }
+        
+        class Bullet {
+            constructor(angle) {
+                this.x = centerX + Math.cos(angle) * (castleRadius + 20);
+                this.y = centerY + Math.sin(angle) * (castleRadius + 20);
+                this.vx = Math.cos(angle) * 8;
+                this.vy = Math.sin(angle) * 8;
+                this.radius = 4;
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // Check if out of bounds
+                const dist = Math.sqrt((this.x - centerX) ** 2 + (this.y - centerY) ** 2);
+                return dist < gameRadius + 50;
+            }
+            
+            draw() {
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+        
+        class BouncingBullet {
+            constructor(x, y, angle) {
+                this.x = x;
+                this.y = y;
+                this.vx = Math.cos(angle + Math.PI) * 5; // Bounce back
+                this.vy = Math.sin(angle + Math.PI) * 5;
+                this.radius = 3;
+                this.lifetime = 30; // Disappear after 30 frames
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.lifetime--;
+                return this.lifetime > 0;
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.lifetime / 30;
+                ctx.fillStyle = '#ffaa00';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+        
+        function drawCastle() {
+            // Blink castle during blinking phase or if game over
+            if (gameState.blinkingPhase || gameState.gameOver) {
+                const blinkPhase = Math.floor(Date.now() / 200) % 2;
+                ctx.fillStyle = blinkPhase ? '#ff0000' : '#444';
+            } else {
+                ctx.fillStyle = '#444';
+            }
+            
+            // Castle base
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, castleRadius, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Castle details
+            ctx.fillStyle = (gameState.blinkingPhase || gameState.gameOver) && Math.floor(Date.now() / 200) % 2 ? '#ff6666' : '#555';
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * 2 * Math.PI;
+                const x = centerX + Math.cos(angle) * (castleRadius - 10);
+                const y = centerY + Math.sin(angle) * (castleRadius - 10);
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+            
+            // Machine gun
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(gameState.beamAngle - Math.PI / 2); // Subtract 90 degrees instead to align properly
+            
+            // Gun base at center
+            ctx.fillStyle = '#666';
+            ctx.fillRect(-8, -8, 16, 16);
+            
+            // Gun barrel pointing outward along beam center, extending beyond castle
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-4, 0, 8, 70); // Extended from 45 to 70 to go beyond castle radius
+            ctx.fillRect(-3, 70, 6, 10);
+            
+            ctx.restore();
+        }
+        
+        function drawBeam() {
+            ctx.save();
+            ctx.globalAlpha = 0.5;
+            
+            // Create gradient for beam
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, gameRadius);
+            gradient.addColorStop(0, 'rgba(255, 255, 200, 0.8)');
+            gradient.addColorStop(0.7, 'rgba(255, 255, 200, 0.4)');
+            gradient.addColorStop(1, 'rgba(255, 255, 200, 0.2)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, gameRadius, 
+                gameState.beamAngle - gameState.beamWidth / 2, 
+                gameState.beamAngle + gameState.beamWidth / 2);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+        }
+        
+        function updateGame() {
+            if (!gameState.gameStarted) return;
+            
+            const now = Date.now();
+            
+            // Handle blinking phase
+            if (gameState.blinkingPhase) {
+                const blinkDuration = (now - gameState.blinkStartTime) / 1000;
+                if (blinkDuration >= 5) {
+                    // End blinking phase and show game over
+                    gameState.blinkingPhase = false;
+                    gameState.gameOver = true;
+                    gameState.showGameOverOptions = true;
+                    document.getElementById('gameOver').style.display = 'block';
+                }
+                return; // Don't update anything else during blinking
+            }
+            
+            // Update level timer only if game is not over
+            if (!gameState.gameOver) {
+                const levelElapsed = (now - gameState.lastLevelTime) / 1000;
+                gameState.levelTimer = Math.max(0, 60 - levelElapsed);
+                
+                if (gameState.levelTimer === 0) {
+                    gameState.level++;
+                    gameState.lastLevelTime = now;
+                    gameState.levelTimer = 60;
+                    
+                    // Update spawn rate every level
+                    gameState.monsterSpawnInterval = Math.max(1, gameState.monsterSpawnInterval - 0.5);
+                }
+            }
+            
+            // Spawn monsters (only if game not over)
+            if (!gameState.gameOver && (now - gameState.lastSpawnTime) / 1000 > gameState.monsterSpawnInterval) {
+                gameState.monsters.push(new Monster());
+                gameState.lastSpawnTime = now;
+            }
+            
+            // Rotate beam
+            if (keys.ArrowLeft) {
+                gameState.beamAngle -= 0.05;
+            }
+            if (keys.ArrowRight) {
+                gameState.beamAngle += 0.05;
+            }
+            
+            // Shoot bullets (only if game not over)
+            if (!gameState.gameOver && keys.Space && !keys.spacePressed) {
+                gameState.bullets.push(new Bullet(gameState.beamAngle));
+                keys.spacePressed = true;
+            }
+            if (!keys.Space) {
+                keys.spacePressed = false;
+            }
+            
+            // Update monsters
+            gameState.monsters = gameState.monsters.filter(monster => monster.update());
+            
+            // Update bullets
+            gameState.bullets = gameState.bullets.filter(bullet => bullet.update());
+            
+            // Check collisions
+            for (let i = gameState.bullets.length - 1; i >= 0; i--) {
+                const bullet = gameState.bullets[i];
+                for (let j = gameState.monsters.length - 1; j >= 0; j--) {
+                    const monster = gameState.monsters[j];
+                    const dist = Math.sqrt((bullet.x - monster.x) ** 2 + (bullet.y - monster.y) ** 2);
+                    
+                    if (dist < bullet.radius + monster.radius) {
+                        gameState.bullets.splice(i, 1);
+                        
+                        // Damage the monster
+                        monster.hp--;
+                        
+                        if (monster.hp <= 0) {
+                            // Monster killed
+                            gameState.monsters.splice(j, 1);
+                            gameState.kills++;
+                        } else {
+                            // Monster hit but not killed - bullet bounces off
+                            monster.hitFlash = 5; // Flash white for 5 frames
+                            const angle = Math.atan2(bullet.y - monster.y, bullet.x - monster.x);
+                            gameState.bouncingBullets.push(new BouncingBullet(monster.x, monster.y, angle));
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Update bouncing bullets
+            gameState.bouncingBullets = gameState.bouncingBullets.filter(bullet => bullet.update());
+            
+            // Update UI
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('kills').textContent = gameState.kills;
+            document.getElementById('attacking').textContent = gameState.monsters.length;
+            document.getElementById('timer').textContent = Math.ceil(gameState.levelTimer);
+        }
+        
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw game boundary
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, gameRadius, 0, 2 * Math.PI);
+            ctx.stroke();
+            
+            // Draw beam
+            drawBeam();
+            
+            // Draw monsters
+            gameState.monsters.forEach(monster => monster.draw());
+            
+            // Draw bullets
+            gameState.bullets.forEach(bullet => bullet.draw());
+            
+            // Draw bouncing bullets
+            gameState.bouncingBullets.forEach(bullet => bullet.draw());
+            
+            // Draw castle
+            drawCastle();
+        }
+        
+        function gameLoop() {
+            updateGame();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Game reset and score functions
+        function resetToStartScreen() {
+            gameState = {
+                level: 1,
+                kills: 0,
+                levelTimer: 60,
+                monsterSpawnTimer: 10,
+                monsterSpawnInterval: 10,
+                gameOver: false,
+                gameStarted: false,
+                beamAngle: -Math.PI / 2,
+                beamWidth: Math.PI / 6,
+                monsters: [],
+                bullets: [],
+                bouncingBullets: [],
+                lastSpawnTime: Date.now(),
+                lastLevelTime: Date.now(),
+                monsterCount: 0,
+                gameStartTime: Date.now(),
+                highScores: gameState.highScores || [],
+                blinkingPhase: false,
+                blinkStartTime: 0,
+                showGameOverOptions: false
+            };
+            
+            // Hide all game over screens and show start screen
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('nameEntry').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'flex';
+        }
+        
+        function saveScore() {
+            const playerNameInput = document.getElementById('playerName');
+            if (playerNameInput) {
+                const playerName = playerNameInput.value.trim();
+                if (playerName) {
+                    const score = {
+                        name: playerName,
+                        level: gameState.level,
+                        kills: gameState.kills,
+                        time: Math.floor((Date.now() - gameState.gameStartTime) / 1000),
+                        date: new Date().toLocaleDateString()
+                    };
+                    
+                    gameState.highScores.push(score);
+                    console.log('Score saved:', score);
+                    
+                    // Clear the input field
+                    playerNameInput.value = '';
+                    
+                    // Go back to start screen
+                    resetToStartScreen();
+                }
+            }
+        }
+        
+        function skipScore() {
+            // Go back to start screen without saving
+            resetToStartScreen();
+        }
+        
+        // Event listeners
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Enter') {
+                if (!gameState.gameStarted) {
+                    // Start game
+                    gameState.gameStarted = true;
+                    gameState.lastSpawnTime = Date.now();
+                    gameState.lastLevelTime = Date.now();
+                    gameState.gameStartTime = Date.now();
+                    document.getElementById('startScreen').style.display = 'none';
+                } else if (document.getElementById('nameEntry').style.display === 'block') {
+                    // Save score when Enter is pressed in name entry
+                    saveScore();
+                }
+            }
+            
+            // Handle Y/N responses for game over
+            if (gameState.showGameOverOptions) {
+                if (e.code === 'KeyY') {
+                    // User wants to record result
+                    gameState.showGameOverOptions = false;
+                    document.getElementById('gameOver').style.display = 'none';
+                    
+                    const scoreDisplay = document.getElementById('scoreDisplay');
+                    const nameEntry = document.getElementById('nameEntry');
+                    const playerNameInput = document.getElementById('playerName');
+                    
+                    if (scoreDisplay) {
+                        scoreDisplay.innerHTML = `
+                            <div>Level Reached: ${gameState.level}</div>
+                            <div>Monsters Killed: ${gameState.kills}</div>
+                            <div>Time Survived: ${Math.floor((Date.now() - gameState.gameStartTime) / 1000)}s</div>
+                        `;
+                    }
+                    
+                    if (nameEntry) {
+                        nameEntry.style.display = 'block';
+                    }
+                    
+                    if (playerNameInput) {
+                        playerNameInput.focus();
+                    }
+                } else if (e.code === 'KeyN') {
+                    // User doesn't want to record result, go to start screen
+                    resetToStartScreen();
+                }
+            }
+            
+            if (keys.hasOwnProperty(e.code)) {
+                keys[e.code] = true;
+                e.preventDefault();
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.code)) {
+                keys[e.code] = false;
+                e.preventDefault();
+            }
+        });
+        
+        // Start game loop
+        gameLoop();
+        
+        }); // End of DOMContentLoaded
+    </script>
+</body>
+</html>
