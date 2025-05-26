@@ -181,8 +181,8 @@
             <p style="color: #fff; margin-top: 20px;">Enter your name to save your score:</p>
             <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
             <br>
-            <button onclick="saveScore()">Save Score</button>
-            <button onclick="skipScore()" style="background: #666; margin-left: 10px;">Skip</button>
+            <button id="saveScoreBtn">Save Score</button>
+            <button id="skipScoreBtn" style="background: #666; margin-left: 10px;">Skip</button>
         </div>
     </div>
 
@@ -696,9 +696,14 @@
         }
         
         function saveScore() {
+            console.log('saveScore function called'); // Debug log
             const playerNameInput = document.getElementById('playerName');
+            console.log('playerNameInput:', playerNameInput); // Debug log
+            
             if (playerNameInput) {
                 const playerName = playerNameInput.value.trim();
+                console.log('playerName:', playerName); // Debug log
+                
                 if (playerName) {
                     const score = {
                         name: playerName,
@@ -710,13 +715,19 @@
                     
                     gameState.highScores.push(score);
                     console.log('Score saved:', score);
+                    console.log('All high scores:', gameState.highScores);
                     
                     // Clear the input field
                     playerNameInput.value = '';
                     
                     // Go back to start screen
                     resetToStartScreen();
+                } else {
+                    alert('Please enter your name to save the score!');
                 }
+            } else {
+                console.error('playerNameInput element not found');
+                alert('Error: Could not find name input field');
             }
         }
         
@@ -785,6 +796,24 @@
                 e.preventDefault();
             }
         });
+        
+        // Add event listeners for score buttons
+        const saveScoreBtn = document.getElementById('saveScoreBtn');
+        const skipScoreBtn = document.getElementById('skipScoreBtn');
+        
+        if (saveScoreBtn) {
+            saveScoreBtn.addEventListener('click', function() {
+                console.log('Save Score button clicked'); // Debug log
+                saveScore();
+            });
+        }
+        
+        if (skipScoreBtn) {
+            skipScoreBtn.addEventListener('click', function() {
+                console.log('Skip Score button clicked'); // Debug log
+                skipScore();
+            });
+        }
         
         // Start game loop
         gameLoop();
