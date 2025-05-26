@@ -221,6 +221,7 @@
             bouncingBullets: [],
             lastSpawnTime: Date.now(),
             lastLevelTime: Date.now(),
+            lastUpdateTime: Date.now(),
             monsterCount: 0,
             gameStartTime: Date.now(),
             highScores: [],
@@ -274,7 +275,7 @@
                 this.hitFlash = 0;
             }
             
-            update() {
+            update(deltaTime) {
                 const dx = centerX - this.x;
                 const dy = centerY - this.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
@@ -293,14 +294,15 @@
                     return true; // Keep the monster in the array so it can be drawn
                 }
                 
-                // Calculate base movement toward castle
-                let moveX = (dx / dist) * this.speed;
-                let moveY = (dy / dist) * this.speed;
+                // Calculate base movement toward castle - now time-based
+                const speedPerSecond = this.speed * 60; // Convert to pixels per second (assuming 60fps baseline)
+                let moveX = (dx / dist) * speedPerSecond * deltaTime;
+                let moveY = (dy / dist) * speedPerSecond * deltaTime;
                 
                 // Apply curved movement for level 3+
                 if (gameState.level >= 3) {
-                    // Update curve timing
-                    this.timeSinceDirectionChange++;
+                    // Update curve timing - now time-based
+                    this.timeSinceDirectionChange += deltaTime * 60; // Convert to frame-equivalent
                     
                     // Randomly change curve direction
                     if (this.timeSinceDirectionChange > this.directionChangeInterval) {
@@ -313,12 +315,12 @@
                     const perpX = -dy / dist;
                     const perpY = dx / dist;
                     
-                    // Add curved movement
+                    // Add curved movement - now time-based
                     const curveAmount = Math.sin(this.curveOffset) * this.curveDirection * 0.5;
-                    moveX += perpX * curveAmount * this.speed;
-                    moveY += perpY * curveAmount * this.speed;
+                    moveX += perpX * curveAmount * speedPerSecond * deltaTime;
+                    moveY += perpY * curveAmount * speedPerSecond * deltaTime;
                     
-                    this.curveOffset += this.curveIntensity;
+                    this.curveOffset += this.curveIntensity * deltaTime * 60; // Convert to frame-equivalent
                 }
                 
                 // Apply movement
@@ -413,9 +415,9 @@
                 this.radius = 4;
             }
             
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
+            update(deltaTime) {
+                this.x += this.vx * deltaTime * 60; // Convert to time-based movement
+                this.y += this.vy * deltaTime * 60;
                 
                 // Check if out of bounds
                 const dist = Math.sqrt((this.x - centerX) ** 2 + (this.y - centerY) ** 2);
@@ -440,10 +442,10 @@
                 this.lifetime = 30; // Disappear after 30 frames
             }
             
-            update() {
-                this.x += this.vx;
-                this.y += this.vy;
-                this.lifetime--;
+            update(deltaTime) {
+                this.x += this.vx * deltaTime * 60; // Convert to time-based movement
+                this.y += this.vy * deltaTime * 60;
+                this.lifetime -= deltaTime * 60; // Convert to time-based lifetime
                 return this.lifetime > 0;
             }
             
@@ -526,6 +528,8 @@
             if (!gameState.gameStarted) return;
             
             const now = Date.now();
+            const deltaTime = (now - gameState.lastUpdateTime) / 1000; // Time since last update in seconds
+            gameState.lastUpdateTime = now;
             
             // Handle blinking phase
             if (gameState.blinkingPhase) {
@@ -561,12 +565,13 @@
                 gameState.lastSpawnTime = now;
             }
             
-            // Rotate beam
+            // Rotate beam - now time-based instead of frame-based
+            const rotationSpeed = 3.0; // radians per second (adjustable)
             if (keys.ArrowLeft) {
-                gameState.beamAngle -= 0.05;
+                gameState.beamAngle -= rotationSpeed * deltaTime;
             }
             if (keys.ArrowRight) {
-                gameState.beamAngle += 0.05;
+                gameState.beamAngle += rotationSpeed * deltaTime;
             }
             
             // Shoot bullets (only if game not over)
@@ -579,10 +584,10 @@
             }
             
             // Update monsters
-            gameState.monsters = gameState.monsters.filter(monster => monster.update());
+            gameState.monsters = gameState.monsters.filter(monster => monster.update(deltaTime));
             
             // Update bullets
-            gameState.bullets = gameState.bullets.filter(bullet => bullet.update());
+            gameState.bullets = gameState.bullets.filter(bullet => bullet.update(deltaTime));
             
             // Check collisions
             for (let i = gameState.bullets.length - 1; i >= 0; i--) {
@@ -613,7 +618,7 @@
             }
             
             // Update bouncing bullets
-            gameState.bouncingBullets = gameState.bouncingBullets.filter(bullet => bullet.update());
+            gameState.bouncingBullets = gameState.bouncingBullets.filter(bullet => bullet.update(deltaTime));
             
             // Update UI
             document.getElementById('level').textContent = gameState.level;
@@ -673,6 +678,7 @@
                 bouncingBullets: [],
                 lastSpawnTime: Date.now(),
                 lastLevelTime: Date.now(),
+                lastUpdateTime: Date.now(),
                 monsterCount: 0,
                 gameStartTime: Date.now(),
                 highScores: gameState.highScores || [],
