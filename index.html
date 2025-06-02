@@ -155,6 +155,51 @@
             margin-top: 20px;
             font-size: 18px;
         }
+        
+        #topScores {
+            position: absolute;
+            bottom: 20px;
+            right: -200px;
+            color: #fff;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            min-width: 200px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+        
+        #topScores h3 {
+            margin: 0 0 10px 0;
+            color: #ffff00;
+            font-size: 16px;
+            text-align: center;
+        }
+        
+        #topScores .score-entry {
+            margin: 5px 0;
+            padding: 3px 0;
+            border-bottom: 1px solid #444;
+        }
+        
+        #topScores .score-entry:last-child {
+            border-bottom: none;
+        }
+        
+        #topScores .score-rank {
+            color: #ffaa00;
+            font-weight: bold;
+        }
+        
+        #topScores .score-name {
+            color: #fff;
+        }
+        
+        #topScores .score-details {
+            color: #ccc;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -183,6 +228,13 @@
             <br>
             <button id="saveScoreBtn">Save Score</button>
             <button id="skipScoreBtn" style="background: #666; margin-left: 10px;">Skip</button>
+        </div>
+        
+        <div id="topScores">
+            <h3>Top 3 Scores</h3>
+            <div id="scoresList">
+                <div class="score-entry">No scores yet</div>
+            </div>
         </div>
     </div>
 
@@ -717,6 +769,9 @@
                     console.log('Score saved:', score);
                     console.log('All high scores:', gameState.highScores);
                     
+                    // Update the top scores display
+                    updateTopScores();
+                    
                     // Clear the input field
                     playerNameInput.value = '';
                     
@@ -734,6 +789,33 @@
         function skipScore() {
             // Go back to start screen without saving
             resetToStartScreen();
+        }
+        
+        function updateTopScores() {
+            const scoresList = document.getElementById('scoresList');
+            if (!scoresList) return;
+            
+            // Sort scores by level (descending), then by kills (descending), then by time (ascending)
+            const sortedScores = gameState.highScores.slice().sort((a, b) => {
+                if (b.level !== a.level) return b.level - a.level;
+                if (b.kills !== a.kills) return b.kills - a.kills;
+                return a.time - b.time;
+            });
+            
+            // Get top 3 scores
+            const top3 = sortedScores.slice(0, 3);
+            
+            if (top3.length === 0) {
+                scoresList.innerHTML = '<div class="score-entry">No scores yet</div>';
+            } else {
+                scoresList.innerHTML = top3.map((score, index) => `
+                    <div class="score-entry">
+                        <span class="score-rank">#${index + 1}</span>
+                        <span class="score-name">${score.name}</span><br>
+                        <span class="score-details">Level ${score.level} • ${score.kills} kills • ${score.time}s</span>
+                    </div>
+                `).join('');
+            }
         }
         
         // Event listeners
@@ -755,6 +837,7 @@
             // Handle Y/N responses for game over
             if (gameState.showGameOverOptions) {
                 if (e.code === 'KeyY') {
+                    e.preventDefault(); // Prevent the Y from being typed in the input field
                     // User wants to record result
                     gameState.showGameOverOptions = false;
                     document.getElementById('gameOver').style.display = 'none';
@@ -779,6 +862,7 @@
                         playerNameInput.focus();
                     }
                 } else if (e.code === 'KeyN') {
+                    e.preventDefault(); // Prevent any default behavior
                     // User doesn't want to record result, go to start screen
                     resetToStartScreen();
                 }
@@ -817,6 +901,9 @@
         
         // Start game loop
         gameLoop();
+        
+        // Initialize top scores display
+        updateTopScores();
         
         }); // End of DOMContentLoaded
     </script>
