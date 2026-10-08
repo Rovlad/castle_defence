@@ -16,6 +16,8 @@ function boot(blockStorage = false, withAudio = false) {
         focus() { sandbox.document.activeElement = this; }
         setPointerCapture() {}
         setAttribute() {}
+        showModal() { this.open = true; }
+        close() { const wasOpen = this.open; this.open = false; if (wasOpen) this.listeners.close?.(); }
     }
     class Input extends Element {}
     class Button extends Element {}
@@ -94,6 +96,27 @@ opening.advance(150);opening.t.updateGame();
 assert.equal(opening.t.state.monsters.length,1);
 assert(opening.t.state.monsters[0].visible);
 assert.equal(opening.t.state.firstSpawn,false);
+// Settings pauses combat without consuming survival time or losing firing on return.
+const settings=boot();settings.t.startGame();
+settings.advance(1000);settings.t.updateGame();
+settings.elements.settingsBtn.listeners.click();
+assert(settings.t.state.settingsOpen);assert(settings.elements.settingsDialog.open);
+const settingsStart=settings.t.state.gameStartTime;
+settings.elements.fireBtn.listeners.click();assert.equal(settings.t.state.bullets.length,0);
+settings.advance(15000);settings.t.updateGame();assert.equal(settings.t.state.waveSpawned,0);
+settings.elements.closeSettingsBtn.listeners.click();
+assert.equal(settings.t.state.settingsOpen,false);assert.equal(settings.elements.settingsDialog.open,false);
+assert.equal(settings.t.state.gameStartTime,settingsStart+15000);
+assert.equal(settings.elements.waveTime.textContent,'0:01');
+settings.pressSpace();assert.equal(settings.t.state.bullets.length,1);
+// Background time inside Settings is excluded once, not once per pause mechanism.
+settings.elements.settingsBtn.listeners.click();settings.advance(2000);
+settings.sandbox.document.hidden=true;settings.events.visibilitychange();settings.advance(10000);
+settings.sandbox.document.hidden=false;settings.events.visibilitychange();settings.advance(2000);
+settings.elements.closeSettingsBtn.listeners.click();
+assert.equal(settings.sandbox.Date.now()-settings.t.state.gameStartTime,1000);
+settings.elements.settingsBtn.listeners.click();settings.elements.settingsDialog.close();
+assert.equal(settings.t.state.settingsOpen,false,'Native dialog close restores gameplay');
 opening.t.state.beamAngle += Math.PI;
 opening.advance(33);opening.t.updateGame();
 assert(opening.t.state.monsters[0].reveal > 0); // Brief fade after the beam moves away.
@@ -223,6 +246,7 @@ storage.set('castle-defense-scores-v1','[{"name":"bad"}]');assert.equal(boot().t
 console.log('PASS: existing controls/combat/scoring plus finite waves, survivor gating, repairs, break/choice gating, one capped upgrade, expanded ammo, reset, pause accounting, bounded/panned audio, mute persistence and hidden-page audio suspension.');
 console.log('PASS: iOS playback session, gesture retry after interruption, unmute/test chime, async/denied resume, closed-context recovery, unsupported audio and denied session setting.');
 })().catch(error => { console.error(error);process.exitCode=1; });
+
 
 
 
