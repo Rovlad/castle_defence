@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-"Castle Defense: Night Siege" — a browser canvas game contained entirely in `index.html`. HTML, CSS, and JS are in that one file; there is no build step, no package manager, no dependencies, a dependency-free Node regression check (`node check.cjs`), and no linter. `README.md` is a one-line stub.
+"Castle Defense: Night Siege" — a browser canvas game contained entirely in `index.html`. HTML, CSS, and JS are in that one file; there is no build step, no package manager, no dependencies, a dependency-free Node regression check (`node check.cjs`), and no linter. `README.md` contains play and verification instructions.
 
 ## Running
 
@@ -27,17 +27,19 @@ All script code lives inside a single `DOMContentLoaded` callback. Nothing is at
 
 **Geometry.** Fixed 800×800 canvas; `gameRadius = 380` is the spawn ring and bullet despawn boundary, `castleRadius = 60` is the breach threshold. Monsters spawn at a random angle on the ring and steer toward the center. Everything is polar math around `centerX/centerY`.
 
-**The beam is visibility only, not a weapon.** `Monster.update()` sets `this.visible` by comparing the monster's angle to `gameState.beamAngle` within `beamWidth / 2`, and `draw()` skips invisible monsters. Bullet–monster collision is plain distance checking and ignores visibility entirely — you can kill what you can't see.
+**The beam is visibility only, not a weapon.** `Monster.update()` sets `this.visible` by comparing the monster's angle to `gameState.beamAngle` within `beamWidth / 2`. A `reveal` value fades enemies over 0.35s after they leave the beam. Bullet–monster collision is plain distance checking and ignores visibility entirely — you can kill what you can't see.
 
-**Difficulty ramp.** Levels advance every 60s of wall time. Per level: `monsterSpawnInterval` drops 0.5s (floor 1s) and monster speed rises 0.1. From level 3 monsters gain sinusoidal curved drift. Monster tiers key off `gameState.monsterCount`, a lifetime spawn counter, not a per-level one: level ≥7 and every 3rd spawn → 3 HP `heavy` (green), level ≥5 and every 2nd spawn → 2 HP `armored` (purple), else 1 HP `normal` (red). Multi-HP monsters bounce the bullet off as a decorative `BouncingBullet` instead of dying.
+**Difficulty ramp.** The first monster appears inside the beam after 2.5s. Later enemies spawn every 6s initially; each 60s level reduces this by 0.5s (floor 1s). Base speed is 0.65 + 0.1 per additional level, in pixels per 60fps frame. Curved paths begin at level 3. From level 3 every second spawn is armored (2 HP, hexagonal silhouette, 85% speed); from level 5 every third spawn is heavy (3 HP, broad silhouette, 65% speed). Normal runners have a narrow silhouette. Monster tiers use the lifetime spawn counter.
 
 **Fire limit.** Max 3 bullets in flight, enforced by `gameState.bullets.length <= 2` at push time. `keys.spacePressed` is a manual edge-detect latch so holding SPACE fires once.
 
-**Death sequence** spans several fields and is easy to break piecemeal: a monster reaching the castle sets `atCastle` and flips `blinkingPhase`; `updateGame()` then returns early for 5 seconds of red blinking before setting `gameOver` + `showGameOverOptions` and revealing `#gameOver`. From there the keydown handler routes `Y` → `#nameEntry` and `N` → `resetToStartScreen()`.
+**Castle damage and death.** Start with 3 health. Each monster reaching the castle damages it once, emits particles and is removed by returning false from update(). Nonfatal breaches keep play running; the final breach freezes `survivalTime`, starts `blinkingPhase`, and stops combat. After 1.2s, gameOver and showGameOverOptions reveal the score/restart overlay. Castle cracks reflect damage. `updateHud()` refreshes health, ammo and statistics, including after a reset.
+
+**Rendering.** Terrain is generated once on an offscreen canvas, then copied each frame. Five translucent wedges feather the beam. Bullet trails, muzzle flash, sparks and death fragments provide feedback. Particles are capped at 160 and cleaned up by updateEffects(); effects and damage flashes decay with deltaTime. Cosmetic drawing must not mutate combat state.
 
 **State reset.** `createState(highScores)` is the one definition of the state shape — add new fields there. `resetToStartScreen()` **reassigns `gameState` to a fresh object** rather than mutating it, passing `highScores` through as the only thing that survives a game. Because the object is swapped wholesale, nothing may cache a long-lived reference to `gameState` itself; read it through the binding each time. Timestamps captured in `createState()` are page-load-relative, so the Enter handler re-stamps `lastSpawnTime` / `lastLevelTime` / `gameStartTime` / `lastUpdateTime` at the moment play actually begins.
 
-**High scores** — stored locally under `castle-defense-scores-v1`, validated when loaded and capped at 100 entries. Storage errors fall back to session-only scores. `updateTopScores()` sorts by level desc → kills desc → time asc and renders the top 3 with HTML-escaped names. `survivalTime` freezes at the first castle breach, so the blink sequence and name entry do not increase it. Input events leave name typing alone; blur, visibility changes and resets clear held keys.
+**High scores** — stored locally under `castle-defense-scores-v1`, validated when loaded and capped at 100 entries. Storage errors fall back to session-only scores. `updateTopScores()` sorts by level desc → kills desc → time asc and renders the top 3 with HTML-escaped names. `survivalTime` freezes at the final castle breach, so the blink sequence and name entry do not increase it. Input events leave name typing alone; blur, visibility changes and resets clear held keys.
 
 ## Conventions
 
