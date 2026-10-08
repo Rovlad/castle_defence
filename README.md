@@ -21,7 +21,7 @@ Beam upgrades add 5° up to 90°, the turret can be upgraded six times, and ammu
 
 ## Scores and mobile use
 
-The layout scales to desktop and mobile, with touch controls and health/ammunition indicators. Terrain, ruins, mist, searchlight, trails and particles are drawn locally on canvas.
+The layout scales to desktop and mobile, with touch controls and health/ammunition indicators. Below the battlefield, a wave panel shows progress, enemies remaining, elapsed wave time and the next-enemy countdown. Waves end when all enemies are resolved, so there is no fixed countdown to the wave end. High scores appear on the start screen. Terrain, ruins, mist, searchlight, trails and particles are drawn locally on canvas.
 
 Scores are stored in this browser, not shared across devices. Blocked storage falls back to session-only scores. Survival time stops at the final breach and excludes resupply and hidden-page pauses. New wave-mode scores rank ahead of retained older scores, which are labeled Legacy level because the modes are not directly comparable. All upgrades reset for a new run.
 
