@@ -5,7 +5,7 @@ const html = fs.readFileSync(__dirname + '/index.html', 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 new vm.Script(script);
 const storage = new Map();
-function boot(blockStorage = false) {
+function boot(blockStorage = false, withAudio = false) {
     let now = 100000;
     const events = {};
     const ctx = new Proxy({}, {get: (_, key) => key === 'createRadialGradient' ? () => ({addColorStop(){}}) : () => {}});
@@ -14,6 +14,7 @@ function boot(blockStorage = false) {
         addEventListener(type, fn) { this.listeners[type] = fn; }
         focus() {}
         setPointerCapture() {}
+        setAttribute() {}
     }
     class Input extends Element {}
     class Button extends Element {}
@@ -27,11 +28,24 @@ function boot(blockStorage = false) {
         document: {getElementById: id => elements[id],addEventListener: (type, fn) => {events[type] = fn;}},
         window: {addEventListener: (type, fn) => {events[type] = fn;}}};
     sandbox.document.createElement = () => ({width:800,height:800,getContext:()=>ctx});
+    const audio = {started:0, resumed:0, suspended:0, disconnected:0, pans:[], oscillators:[], gains:[]};
+    if (withAudio) {
+        const param = () => ({value:0,setValueAtTime(value){this.value=value;},exponentialRampToValueAtTime(){}});
+        const node = () => ({connect(){},disconnect(){audio.disconnected++;}});
+        sandbox.window.AudioContext = class {
+            constructor(){this.state='running';this.currentTime=0;this.destination={};}
+            resume(){this.state='running';audio.resumed++;return Promise.resolve();}
+            suspend(){this.state='suspended';audio.suspended++;return Promise.resolve();}
+            createGain(){const gain={...node(),gain:param()};audio.gains.push(gain);return gain;}
+            createStereoPanner(){const p={...node(),pan:param()};audio.pans.push(p);return p;}
+            createOscillator(){const osc={...node(),frequency:param(),start(){audio.started++;},stop(){}};audio.oscillators.push(osc);return osc;}
+        };
+    }
     vm.createContext(sandbox);
-    const instrumented = script.replace('        // Start game loop', '        window.test = {get state(){return gameState;}, keys, startGame, updateGame, saveScore, resetToStartScreen, showNameEntry, Monster};\n        // Start game loop');
+    const instrumented = script.replace('        // Start game loop', '        window.test = {get state(){return gameState;}, keys, startGame, updateGame, saveScore, resetToStartScreen, showNameEntry, Monster, finishWave, chooseUpgrade, nextWave, updateBreak, playSound};\n        // Start game loop');
     vm.runInContext(instrumented, sandbox);
     events.DOMContentLoaded();
-    return {t:sandbox.window.test, elements, events, advance(ms){now+=ms;}, key(code,target){let prevented=false;events.keydown({code,target,repeat:false,preventDefault(){prevented=true;}});return prevented;}};
+    return {t:sandbox.window.test, elements, events, sandbox, audio, advance(ms){now+=ms;}, key(code,target){let prevented=false;events.keydown({code,target,repeat:false,preventDefault(){prevented=true;}});return prevented;}};
 }
 const g = boot();
 g.elements.startBtn.listeners.click();
@@ -90,8 +104,69 @@ assert.equal(combat.t.state.kills,1);assert.equal(combat.t.state.monsters.length
 assert.equal(combat.t.state.bullets.length,0);assert(combat.t.state.particles.length>0);
 for(let i=0;i<30;i++){combat.advance(33);combat.t.updateGame();}
 assert.equal(combat.t.state.particles.length,0);
+const waves = boot(); waves.t.startGame();
+for(let i=0;i<5;i++) {
+    waves.advance(2700); waves.t.updateGame();
+    assert.equal(waves.t.state.waveSpawned,i+1);
+    assert.equal(waves.t.state.phase,'combat'); // Wave is not cleared while any enemy remains.
+    waves.t.state.monsters=[];
+}
+waves.t.state.health=1;
+waves.advance(16);waves.t.updateGame();
+assert.equal(waves.t.state.phase,'intermission');assert.equal(waves.t.state.health,2);
+assert.equal(waves.t.state.bullets.length,0);
+const clearedAt = waves.sandbox.Date.now();
+const combatTime = clearedAt-waves.t.state.gameStartTime;
+waves.elements.fireBtn.listeners.click();assert.equal(waves.t.state.bullets.length,0);
+waves.t.nextWave();assert.equal(waves.t.state.level,1);
+waves.t.chooseUpgrade('ammo');assert.equal(waves.t.state.bulletLimit,4);
+const beamBefore=waves.t.state.beamWidth;waves.t.chooseUpgrade('beam');assert.equal(waves.t.state.beamWidth,beamBefore);
+waves.t.nextWave();assert.equal(waves.t.state.phase,'intermission');
+waves.advance(4200);waves.t.updateGame();assert.equal(waves.elements.nextWaveBtn.disabled,false);
+waves.advance(10000);waves.t.nextWave();
+assert.equal(waves.t.state.level,2);assert.equal(waves.t.state.waveSize,7);
+assert.equal(waves.t.state.waveSpawned,0);assert.equal(waves.t.state.phase,'combat');
+assert.equal(waves.sandbox.Date.now()-waves.t.state.gameStartTime,combatTime);
+for(let i=0;i<5;i++)waves.elements.fireBtn.listeners.click();assert.equal(waves.t.state.bullets.length,4);
+// Visibility pause excludes background time and prevents a spawn jump.
+const spawnBefore=waves.t.state.lastSpawnTime;
+waves.sandbox.document.hidden=true;waves.events.visibilitychange();
+waves.advance(30000);waves.t.updateGame();assert.equal(waves.t.state.waveSpawned,0);
+waves.sandbox.document.hidden=false;waves.events.visibilitychange();
+assert.equal(waves.t.state.lastSpawnTime,spawnBefore+30000);
+assert.equal(waves.sandbox.Date.now()-waves.t.state.gameStartTime,combatTime);
+// Upgrade maxima do not soft-lock a completed run.
+waves.t.state.beamWidth=Math.PI/2;waves.t.state.rotationSpeed=5.4;waves.t.state.bulletLimit=6;
+waves.t.finishWave();assert(waves.t.state.upgradeChosen);
+waves.advance(4100);waves.t.nextWave();assert.equal(waves.t.state.level,3);
+waves.t.resetToStartScreen();assert.equal(waves.t.state.bulletLimit,3);assert.equal(waves.t.state.rotationSpeed,3);
+assert.equal(waves.t.state.phase,'combat');assert.equal(waves.t.state.waveSpawned,0);
+// Each upgrade is bounded and can only be applied once per break.
+for(const kind of ['beam','rotation','ammo']) {
+    const u=boot();u.t.startGame();u.t.finishWave();
+    u.t.state.beamWidth=Math.PI/2-Math.PI/36;
+    u.t.state.rotationSpeed=5.0;u.t.state.bulletLimit=5;
+    u.t.chooseUpgrade(kind);
+    assert.equal(kind==='beam'?u.t.state.beamWidth:kind==='rotation'?u.t.state.rotationSpeed:u.t.state.bulletLimit,
+        kind==='beam'?Math.PI/2:kind==='rotation'?5.4:6);
+}
+// Audio is unlocked by start, bounded, panned, muted, persisted and suspended while hidden.
+const sound=boot(false,true);sound.t.startGame();assert.equal(sound.audio.resumed,1);
+sound.elements.fireBtn.listeners.click();assert.equal(sound.audio.started,1);
+sound.t.playSound('step',-.7);assert.equal(sound.audio.pans.at(-1).pan.value,-.7);
+for(let i=0;i<30;i++)sound.t.playSound('shot');assert.equal(sound.audio.started,12);
+for(const osc of sound.audio.oscillators)osc.onended();assert.equal(sound.audio.disconnected,36);
+sound.t.playSound('armor');assert.equal(sound.audio.started,13);
+sound.elements.soundBtn.listeners.click();sound.t.playSound('breach');assert.equal(sound.audio.started,13);
+assert.equal(sound.audio.gains[0].gain.value,0);assert.equal(storage.get('castle-defense-muted'),'true');
+assert.equal(boot().elements.soundBtn.textContent,'Sound off');
+sound.elements.soundBtn.listeners.click();assert.equal(sound.audio.gains[0].gain.value,.18);
+sound.sandbox.document.hidden=true;sound.events.visibilitychange();assert.equal(sound.audio.suspended,1);
+sound.t.playSound('step');assert.equal(sound.audio.started,13);
+sound.sandbox.document.hidden=false;sound.events.visibilitychange();assert.equal(sound.audio.resumed,3);
 assert.equal(boot(true).t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','broken json');assert.equal(boot().t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','[{"name":"bad"}]');assert.equal(boot().t.state.highScores.length,0);
-console.log('PASS: syntax, touch controls, bullet limit, input reset, three distinct breaches, frozen final death time/state, score storage/escaping, reset health/effects, 2.5s opening, enemy reveal fade/tiers, collision kills and effect cleanup.');
+console.log('PASS: existing controls/combat/scoring plus finite waves, survivor gating, repairs, break/choice gating, one capped upgrade, expanded ammo, reset, pause accounting, bounded/panned audio, mute persistence and hidden-page audio suspension.');
+
 
