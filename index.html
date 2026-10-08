@@ -275,6 +275,8 @@
             <div>Monsters Killed: <span id="kills">0</span></div>
             <div>Ammo ready: <span id="ammo">3 / 3</span></div>
             <button id="soundBtn" aria-pressed="false">Sound on</button>
+            <button id="testSoundBtn">Test sound</button>
+            <div id="soundStatus" role="status" aria-live="polite" style="font-size:12px;line-height:1.4;margin-top:6px"></div>
         </div>
         <div id="gameOver">
             GAME OVER!<br>
@@ -630,7 +632,7 @@
             }
         }
         
-        let audioContext = null, masterGain = null, audioVoices = 0;
+        let audioContext = null, masterGain = null, audioVoices = 0, audioGeneration = 0;
         let muted = false;
         try { muted = localStorage.getItem('castle-defense-muted') === 'true'; } catch {}
         function updateSoundButton() {
@@ -638,19 +640,34 @@
             button.textContent = muted ? 'Sound off' : 'Sound on';
             button.setAttribute('aria-pressed',String(muted));
             button.setAttribute('aria-label',muted ? 'Enable sound' : 'Mute sound');
+            const supported = !!(window.AudioContext || window.webkitAudioContext);
+            button.disabled = !supported;
+            document.getElementById('testSoundBtn').disabled = !supported;
+            document.getElementById('soundStatus').textContent = !supported ? 'Audio is unavailable in this browser.' :
+                muted ? 'Sound is muted.' : !audioContext || audioContext.state !== 'running' ?
+                'Tap Test sound to enable audio.' : 'If silent, check your media volume and audio output.';
         }
         function unlockAudio() {
-            if (muted) return;
+            if (muted) return Promise.resolve(false);
             try {
                 const Audio = window.AudioContext || window.webkitAudioContext;
-                if (!Audio) return;
-                if (!audioContext) {
+                if (!Audio) { updateSoundButton(); return Promise.resolve(false); }
+                // On iOS, ambient Web Audio can follow Silent Mode. Playback uses media audio.
+                try { if ('audioSession' in navigator) navigator.audioSession.type = 'playback'; } catch {}
+                if (!audioContext || audioContext.state === 'closed') {
                     audioContext = new Audio();
+                    audioVoices = 0;
+                    audioGeneration++;
                     masterGain = audioContext.createGain(); masterGain.gain.value = .18;
                     masterGain.connect(audioContext.destination);
+                    audioContext.onstatechange = updateSoundButton;
                 }
-                audioContext.resume().catch(() => {});
-            } catch { /* Unsupported or denied audio never interrupts play. */ }
+                const context = audioContext;
+                return context.resume().then(() => {
+                    updateSoundButton();
+                    return context === audioContext && context.state === 'running' && !muted && !document.hidden;
+                }).catch(() => { updateSoundButton(); return false; });
+            } catch { updateSoundButton(); return Promise.resolve(false); }
         }
         function tone(frequency,duration,type,volume,pan=0,ending=frequency) {
             if (muted || !audioContext || audioContext.state !== 'running' || document.hidden || audioVoices >= 12) return;
@@ -658,6 +675,7 @@
                 const osc = audioContext.createOscillator(), gain = audioContext.createGain();
                 const panner = audioContext.createStereoPanner ? audioContext.createStereoPanner() : null;
                 const now = audioContext.currentTime;
+                const generation = audioGeneration;
                 osc.type = type; osc.frequency.setValueAtTime(frequency,now);
                 osc.frequency.exponentialRampToValueAtTime(Math.max(1,ending),now+duration);
                 gain.gain.setValueAtTime(volume,now);
@@ -666,7 +684,10 @@
                 if (panner) { panner.pan.value = pan; gain.connect(panner); panner.connect(masterGain); }
                 else gain.connect(masterGain);
                 audioVoices++;
-                osc.onended = () => { audioVoices--; osc.disconnect(); gain.disconnect(); if (panner) panner.disconnect(); };
+                osc.onended = () => {
+                    if (generation === audioGeneration) audioVoices--;
+                    osc.disconnect(); gain.disconnect(); if (panner) panner.disconnect();
+                };
                 osc.start(now); osc.stop(now+duration);
             } catch { /* Keep gameplay available if an audio node cannot be created. */ }
         }
@@ -685,6 +706,16 @@
             if (!muted) unlockAudio();
             if (masterGain) masterGain.gain.setValueAtTime(muted ? 0 : .18,audioContext.currentTime);
             updateSoundButton();
+        });
+        document.getElementById('testSoundBtn').addEventListener('click', () => {
+            muted = false;
+            try { localStorage.setItem('castle-defense-muted','false'); } catch {}
+            if (masterGain) masterGain.gain.setValueAtTime(.18,audioContext.currentTime);
+            return unlockAudio().then(ready => {
+                if (!ready) return;
+                playSound('clear');
+                document.getElementById('soundStatus').textContent = 'Test chime played. If silent, check media volume or connected headphones.';
+            });
         });
         updateSoundButton();
 
@@ -1148,6 +1179,7 @@
                 else if (e.code === 'KeyN') { e.preventDefault(); resetToStartScreen(); }
             }
             if (Object.hasOwn(keys, e.code)) { keys[e.code] = true; e.preventDefault(); }
+            if (e.code === 'Space' && !e.repeat) unlockAudio();
         });
         window.addEventListener('keyup', e => {
             if (Object.hasOwn(keys, e.code)) {
@@ -1185,6 +1217,7 @@
             const button = document.getElementById(id);
             button.addEventListener('pointerdown', e => {
                 e.preventDefault();
+                unlockAudio();
                 button.setPointerCapture(e.pointerId);
                 keys[key] = true;
             });
@@ -1196,6 +1229,7 @@
         bindTouch('rotateLeftBtn', 'ArrowLeft');
         bindTouch('rotateRightBtn', 'ArrowRight');
         document.getElementById('fireBtn').addEventListener('click', () => {
+            unlockAudio();
             if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && gameState.phase === 'combat' && !document.hidden && gameState.bullets.length < gameState.bulletLimit) {
                 gameState.bullets.push(new Bullet(gameState.beamAngle));
                 updateHud();
@@ -1230,6 +1264,7 @@
     </script>
 </body>
 </html>
+
 
 
 
