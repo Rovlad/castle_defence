@@ -200,6 +200,33 @@
             color: #ccc;
             font-size: 12px;
         }
+        /* Keep the 800px world coordinates while fitting the viewport. */
+        body { overflow: auto; padding: 16px; box-sizing: border-box; }
+        #gameContainer { width: min(800px, 100%); height: auto; display: grid;
+            grid-template-columns: 1fr 1fr; gap: 12px; }
+        #gameCanvas { grid-column: 1 / -1; grid-row: 2; width: 100%; height: auto;
+            box-sizing: border-box; display: block; }
+        #ui-left, #ui-right, #instructions, #topScores {
+            position: static; transform: none; min-width: 0; font-size: 16px;
+        }
+        #ui-left, #ui-right { grid-row: 1; }
+        #instructions, #topScores, #touchControls { grid-column: 1 / -1; }
+        #topScores { text-align: left; }
+        #touchControls { display: flex; justify-content: center; gap: 12px; }
+        button { min-height: 48px; padding: 12px 20px; font-size: 18px;
+            border: 1px solid #777; border-radius: 8px; color: #fff; background: #333; }
+        #touchControls button { touch-action: none; user-select: none; -webkit-user-select: none; }
+        #touchControls button:active { background: #666; }
+        #startScreen { box-sizing: border-box; padding: 20px; overflow-y: auto; }
+        #startScreen h1 { font-size: clamp(26px, 6vw, 48px); }
+        #startScreen p { font-size: 20px; }
+        #gameOver { width: 90%; font-size: 32px; z-index: 10; background: rgba(0,0,0,.9); padding: 12px; }
+        #nameEntry { box-sizing: border-box; width: min(420px, 95%); padding: 20px; }
+        @media (max-width: 480px) {
+            body { padding: 8px; align-items: flex-start; }
+            #ui-left, #ui-right { font-size: 12px; }
+            #touchControls button { flex: 1; padding: 12px 8px; }
+        }
     </style>
 </head>
 <body>
@@ -215,10 +242,17 @@
         </div>
         <div id="gameOver">
             GAME OVER!<br>
-            <span style="font-size: 24px">Do you want to record your result Y/N?</span>
+            <span style="font-size: 24px">Record your result? (Y/N)</span><br>
+            <button id="recordScoreBtn">Record score</button>
+            <button id="restartBtn">Play again</button>
         </div>
         <div id="instructions">
-            Use LEFT/RIGHT arrows to rotate • SPACE to shoot
+            Use LEFT/RIGHT arrows or touch buttons to rotate • SPACE or Fire to shoot
+        </div>
+        <div id="touchControls" aria-label="Game controls">
+            <button id="rotateLeftBtn" aria-label="Rotate left">◀ Left</button>
+            <button id="fireBtn">Fire</button>
+            <button id="rotateRightBtn" aria-label="Rotate right">Right ▶</button>
         </div>
         <div id="nameEntry">
             <h2>Game Over!</h2>
@@ -240,7 +274,8 @@
 
     <div id="startScreen">
         <h1>Castle Defense: Night Siege</h1>
-        <p>Press Enter to start</p>
+        <p>Press Enter or tap Start to play</p>
+        <button id="startBtn">Start game</button>
         <div class="controls">
             Use LEFT/RIGHT arrows to rotate<br>
             SPACE to shoot<br>
@@ -286,11 +321,23 @@
                 highScores: highScores,
                 blinkingPhase: false,
                 blinkStartTime: 0,
-                showGameOverOptions: false
+                showGameOverOptions: false,
+                survivalTime: 0
             };
         }
 
-        let gameState = createState();
+        const SCORE_KEY = 'castle-defense-scores-v1';
+        function loadScores() {
+            try {
+                const scores = JSON.parse(localStorage.getItem(SCORE_KEY) || '[]');
+                if (!Array.isArray(scores)) return [];
+                return scores.filter(score => score && typeof score.name === 'string' &&
+                    score.name.length <= 20 && Number.isInteger(score.level) && score.level >= 1 &&
+                    Number.isInteger(score.kills) && score.kills >= 0 &&
+                    Number.isInteger(score.time) && score.time >= 0).slice(0, 100);
+            } catch { return []; }
+        }
+        let gameState = createState(loadScores());
         
         const keys = {
             ArrowLeft: false,
@@ -357,6 +404,7 @@
                         // Start blinking phase
                         gameState.blinkingPhase = true;
                         gameState.blinkStartTime = Date.now();
+                        gameState.survivalTime = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
                     }
                     
                     return true; // Keep the monster in the array so it can be drawn
@@ -592,7 +640,7 @@
         }
         
         function updateGame() {
-            if (!gameState.gameStarted) return;
+            if (!gameState.gameStarted || gameState.gameOver) return;
             
             const now = Date.now();
             // Time since last update in seconds, clamped: requestAnimationFrame stops while
@@ -735,6 +783,11 @@
         function resetToStartScreen() {
             // High scores are the only thing that survives a reset
             gameState = createState(gameState.highScores || []);
+            clearKeys();
+            document.getElementById('level').textContent = '1';
+            document.getElementById('kills').textContent = '0';
+            document.getElementById('attacking').textContent = '0';
+            document.getElementById('timer').textContent = '60';
 
             // Hide all game over screens and show start screen
             document.getElementById('gameOver').style.display = 'none';
@@ -756,11 +809,15 @@
                         name: playerName,
                         level: gameState.level,
                         kills: gameState.kills,
-                        time: Math.floor((Date.now() - gameState.gameStartTime) / 1000),
+                        time: gameState.survivalTime,
                         date: new Date().toLocaleDateString()
                     };
                     
                     gameState.highScores.push(score);
+                    gameState.highScores.sort(compareScores);
+                    gameState.highScores = gameState.highScores.slice(0, 100);
+                    try { localStorage.setItem(SCORE_KEY, JSON.stringify(gameState.highScores)); }
+                    catch { /* Still keep scores for this session when storage is unavailable. */ }
                     console.log('Score saved:', score);
                     console.log('All high scores:', gameState.highScores);
                     
@@ -791,12 +848,8 @@
             if (!scoresList) return;
             
             // Sort scores by level (descending), then by kills (descending), then by time (ascending)
-            const sortedScores = gameState.highScores.slice().sort((a, b) => {
-                if (b.level !== a.level) return b.level - a.level;
-                if (b.kills !== a.kills) return b.kills - a.kills;
-                return a.time - b.time;
-            });
-            
+            const sortedScores = gameState.highScores.slice().sort(compareScores);
+
             // Get top 3 scores
             const top3 = sortedScores.slice(0, 3);
             
@@ -806,79 +859,89 @@
                 scoresList.innerHTML = top3.map((score, index) => `
                     <div class="score-entry">
                         <span class="score-rank">#${index + 1}</span>
-                        <span class="score-name">${score.name}</span><br>
+                        <span class="score-name">${escapeHtml(score.name)}</span><br>
                         <span class="score-details">Level ${score.level} • ${score.kills} kills • ${score.time}s</span>
                     </div>
                 `).join('');
             }
         }
         
-        // Event listeners
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Enter') {
-                if (!gameState.gameStarted) {
-                    // Start game - lastUpdateTime is stale from however long the start
-                    // screen was up, since updateGame() bails out before refreshing it
-                    const startTime = Date.now();
-                    gameState.gameStarted = true;
-                    gameState.lastSpawnTime = startTime;
-                    gameState.lastLevelTime = startTime;
-                    gameState.gameStartTime = startTime;
-                    gameState.lastUpdateTime = startTime;
-                    document.getElementById('startScreen').style.display = 'none';
-                } else if (document.getElementById('nameEntry').style.display === 'block') {
-                    // Save score when Enter is pressed in name entry
-                    saveScore();
-                }
+        function compareScores(a, b) {
+            return b.level - a.level || b.kills - a.kills || a.time - b.time;
+        }
+        function escapeHtml(value) {
+            return value.replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[char]));
+        }
+        function clearKeys() {
+            keys.ArrowLeft = keys.ArrowRight = keys.Space = keys.spacePressed = false;
+        }
+        function startGame() {
+            if (gameState.gameStarted) return;
+            clearKeys();
+            const now = Date.now();
+            gameState.gameStarted = true;
+            gameState.lastSpawnTime = gameState.lastLevelTime = now;
+            gameState.gameStartTime = gameState.lastUpdateTime = now;
+            document.getElementById('startScreen').style.display = 'none';
+        }
+        function showNameEntry() {
+            if (!gameState.showGameOverOptions) return;
+            gameState.showGameOverOptions = false;
+            clearKeys();
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('scoreDisplay').textContent =
+                `Level ${gameState.level} • ${gameState.kills} kills • ${gameState.survivalTime}s survived`;
+            document.getElementById('nameEntry').style.display = 'block';
+            document.getElementById('playerName').focus();
+        }
+        window.addEventListener('keydown', e => {
+            if (e.target instanceof HTMLInputElement) {
+                if (e.code === 'Enter' && !e.repeat) { e.preventDefault(); saveScore(); }
+                return;
             }
-            
-            // Handle Y/N responses for game over
+            if (e.target instanceof HTMLButtonElement && (e.code === 'Enter' || e.code === 'Space')) return;
+            if (e.code === 'Enter' && !e.repeat) { e.preventDefault(); startGame(); }
             if (gameState.showGameOverOptions) {
-                if (e.code === 'KeyY') {
-                    e.preventDefault(); // Prevent the Y from being typed in the input field
-                    // User wants to record result
-                    gameState.showGameOverOptions = false;
-                    document.getElementById('gameOver').style.display = 'none';
-                    
-                    const scoreDisplay = document.getElementById('scoreDisplay');
-                    const nameEntry = document.getElementById('nameEntry');
-                    const playerNameInput = document.getElementById('playerName');
-                    
-                    if (scoreDisplay) {
-                        scoreDisplay.innerHTML = `
-                            <div>Level Reached: ${gameState.level}</div>
-                            <div>Monsters Killed: ${gameState.kills}</div>
-                            <div>Time Survived: ${Math.floor((Date.now() - gameState.gameStartTime) / 1000)}s</div>
-                        `;
-                    }
-                    
-                    if (nameEntry) {
-                        nameEntry.style.display = 'block';
-                    }
-                    
-                    if (playerNameInput) {
-                        playerNameInput.focus();
-                    }
-                } else if (e.code === 'KeyN') {
-                    e.preventDefault(); // Prevent any default behavior
-                    // User doesn't want to record result, go to start screen
-                    resetToStartScreen();
-                }
+                if (e.code === 'KeyY') { e.preventDefault(); showNameEntry(); }
+                else if (e.code === 'KeyN') { e.preventDefault(); resetToStartScreen(); }
             }
-            
-            if (keys.hasOwnProperty(e.code)) {
-                keys[e.code] = true;
-                e.preventDefault();
-            }
+            if (Object.hasOwn(keys, e.code)) { keys[e.code] = true; e.preventDefault(); }
         });
-        
-        window.addEventListener('keyup', (e) => {
-            if (keys.hasOwnProperty(e.code)) {
+        window.addEventListener('keyup', e => {
+            if (Object.hasOwn(keys, e.code)) {
                 keys[e.code] = false;
-                e.preventDefault();
+                if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
             }
         });
-        
+        window.addEventListener('blur', clearKeys);
+        document.addEventListener('visibilitychange', clearKeys);
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('recordScoreBtn').addEventListener('click', showNameEntry);
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            resetToStartScreen(); startGame();
+        });
+        function bindTouch(id, key) {
+            const button = document.getElementById(id);
+            button.addEventListener('pointerdown', e => {
+                e.preventDefault();
+                button.setPointerCapture(e.pointerId);
+                keys[key] = true;
+            });
+            const release = () => { keys[key] = false; if (key === 'Space') keys.spacePressed = false; };
+            button.addEventListener('pointerup', release);
+            button.addEventListener('pointercancel', release);
+            button.addEventListener('lostpointercapture', release);
+        }
+        bindTouch('rotateLeftBtn', 'ArrowLeft');
+        bindTouch('rotateRightBtn', 'ArrowRight');
+        document.getElementById('fireBtn').addEventListener('click', () => {
+            if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && gameState.bullets.length < 3) {
+                gameState.bullets.push(new Bullet(gameState.beamAngle));
+            }
+        });
+
         // Add event listeners for score buttons
         const saveScoreBtn = document.getElementById('saveScoreBtn');
         const skipScoreBtn = document.getElementById('skipScoreBtn');
@@ -907,3 +970,4 @@
     </script>
 </body>
 </html>
+
