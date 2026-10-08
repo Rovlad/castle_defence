@@ -261,6 +261,27 @@
         #upgradeChoices small { display: block; font-weight: normal; color: #b1c7d8; margin-top: 4px; }
         button:disabled { opacity: .45; cursor: default; filter: none; }
         #soundBtn { padding: 6px 12px; min-height: 36px; font-size: 13px; margin-top: 6px; }
+        #wavePanel { grid-column: 1 / -1; grid-row: 3; background: #101e2b;
+            border: 1px solid #304455; border-radius: 12px; padding: 14px 16px;
+            display: grid; grid-template-columns: 1.7fr 1fr 1fr; gap: 14px; align-items: center; }
+        .wave-label { display: block; font-size: 12px; color: #9fb8cb; margin-bottom: 5px; }
+        .wave-number { color: #f4dca3; font-size: 20px; font-weight: bold; font-variant-numeric: tabular-nums; }
+        #wavePanel small { display: block; color: #9fb8cb; font-size: 12px; margin-top: 5px; }
+        #waveProgress { display: block; width: 100%; height: 6px; margin-top: 8px; border: none;
+            border-radius: 3px; overflow: hidden; accent-color: #dfbd7a; background: #263d4e; }
+        #waveProgress::-webkit-progress-bar { background: #263d4e; }
+        #waveProgress::-webkit-progress-value { background: #dfbd7a; }
+        #waveProgress::-moz-progress-bar { background: #dfbd7a; }
+        #touchControls { grid-row: 4; bottom: max(8px,env(safe-area-inset-bottom)); }
+        #instructions { grid-row: 5; }
+        #startScreen { justify-content: flex-start; }
+        #startScreen h1 { margin-top: 20px; }
+        #startScreen #topScores { width: min(360px,100%); margin-top: 24px; box-sizing: border-box; }
+        @media (max-width: 480px) {
+            #wavePanel { padding: 12px; gap: 10px; grid-template-columns: 1.4fr 1fr 1fr; }
+            .wave-number { font-size: 17px; }
+        }
+        @media (pointer: coarse) { #instructions { display: none; } }
     </style>
 </head>
 <body>
@@ -268,7 +289,6 @@
         <canvas id="gameCanvas" width="800" height="800"></canvas>
         <div id="ui-left">
             <div>Wave <span id="level">1</span> · Castle <span id="health" aria-label="Castle health">3 / 3</span></div>
-            <div>Remaining: <span id="remaining">5</span> · <span id="waveStatus">Hold the line</span></div>
         </div>
         <div id="ui-right">
             <div>Monsters Attacking: <span id="attacking">0</span></div>
@@ -287,6 +307,18 @@
         <div id="instructions">
             Use LEFT/RIGHT arrows or touch buttons to rotate • SPACE or Fire to shoot
         </div>
+        <section id="wavePanel" aria-label="Current wave">
+            <div>
+                <span class="wave-label">Wave progress</span>
+                <span id="waveResolved" class="wave-number">0 / 5</span>
+                <progress id="waveProgress" value="0" max="5" aria-label="Wave progress"></progress>
+                <small><span id="remaining">5</span> enemies remaining</small>
+            </div>
+            <div><span class="wave-label">Wave time</span><span id="waveTime" class="wave-number">0:00</span>
+                <small id="waveStatus">Hold the line</small></div>
+            <div><span class="wave-label">Next arrival</span><span id="nextArrival" class="wave-number">0:03</span>
+                <small id="arrivalStatus">Incoming</small></div>
+        </section>
         <div id="touchControls" aria-label="Game controls">
             <button id="rotateLeftBtn" aria-label="Rotate left">◀ Left</button>
             <button id="fireBtn">Fire</button>
@@ -316,12 +348,7 @@
             <button id="skipScoreBtn" style="background: #666; margin-left: 10px;">Skip</button>
         </div>
         
-        <div id="topScores">
-            <h3>Top 3 Scores</h3>
-            <div id="scoresList">
-                <div class="score-entry">No scores yet</div>
-            </div>
-        </div>
+
     </div>
 
     <div id="startScreen">
@@ -334,6 +361,12 @@
             <strong>Start with 3 bullets at once!</strong><br>
             Wait for bullets to hit or leave before shooting again<br>
             Clear each wave, then choose an upgrade.<br>Recover 1 castle health between waves.<br>Press Enter or tap Start to begin.
+        </div>
+        <div id="topScores">
+            <h3>Top 3 Scores</h3>
+            <div id="scoresList">
+                <div class="score-entry">No scores yet</div>
+            </div>
         </div>
     </div>
 
@@ -360,6 +393,8 @@
                 monsterSpawnInterval: 2.6,
                 phase: 'combat',
                 waveSize: 5,
+                waveStartTime: now,
+                waveElapsed: 0,
                 waveSpawned: 0,
                 breakStartTime: 0,
                 upgradeChosen: false,
@@ -770,6 +805,8 @@
             const now = Date.now();
             gameState.gameStartTime += now-gameState.breakStartTime; // Score measures combat time only.
             gameState.level++;
+            gameState.waveStartTime = now;
+            gameState.waveElapsed = 0;
             gameState.waveSize = Math.min(25,5+(gameState.level-1)*2);
             gameState.waveSpawned = 0;
             gameState.monsterSpawnInterval = Math.max(.8,2.6-(gameState.level-1)*.15);
@@ -867,6 +904,10 @@
                 p.life -= dt; p.x += p.vx*dt; p.y += p.vy*dt; return p.life > 0;
             });
         }
+        function formatTime(seconds) {
+            const whole = Math.max(0,Math.floor(seconds));
+            return `${Math.floor(whole/60)}:${String(whole%60).padStart(2,'0')}`;
+        }
         function updateHud() {
             document.getElementById('health').textContent = `${gameState.health} / 3`;
             document.getElementById('ammo').textContent = `${gameState.bulletLimit-gameState.bullets.length} / ${gameState.bulletLimit}`;
@@ -875,7 +916,22 @@
             document.getElementById('attacking').textContent = gameState.monsters.length;
             document.getElementById('remaining').textContent =
                 gameState.waveSize - gameState.waveSpawned + gameState.monsters.length;
-            document.getElementById('waveStatus').textContent = gameState.phase === 'intermission' ? 'Resupply' : 'Hold the line';
+            const cleared = gameState.waveSpawned - gameState.monsters.length;
+            document.getElementById('waveResolved').textContent = `${cleared} / ${gameState.waveSize}`;
+            const progress = document.getElementById('waveProgress');
+            progress.max = gameState.waveSize; progress.value = cleared;
+            if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && gameState.phase === 'combat') {
+                gameState.waveElapsed = Math.max(0,(Date.now()-gameState.waveStartTime)/1000);
+            }
+            document.getElementById('waveTime').textContent = formatTime(gameState.waveElapsed);
+            const pending = gameState.waveSize-gameState.waveSpawned;
+            const combat = gameState.gameStarted && gameState.phase === 'combat' && !gameState.gameOver && !gameState.blinkingPhase;
+            document.getElementById('waveStatus').textContent = gameState.health === 0 ? 'Castle lost' :
+                gameState.phase === 'intermission' ? 'Wave cleared' : !gameState.gameStarted ? 'Ready' : pending === 0 ? 'Finish the last enemies' : 'Hold the line';
+            const nextIn = Math.max(0,Math.ceil((gameState.firstSpawn ? 2.5 : gameState.monsterSpawnInterval)-(Date.now()-gameState.lastSpawnTime)/1000));
+            document.getElementById('nextArrival').textContent = combat && pending > 0 ? formatTime(nextIn) : '—';
+            document.getElementById('arrivalStatus').textContent = gameState.phase === 'intermission' ? 'Resupply' :
+                !gameState.gameStarted ? 'On start' : gameState.health === 0 ? 'Run ended' : pending === 0 ? 'All enemies spawned' : 'Incoming';
         }
 
         function updateGame() {
@@ -1139,7 +1195,7 @@
             const now = Date.now();
             gameState.gameStarted = true;
             gameState.lastSpawnTime = gameState.lastLevelTime = now;
-            gameState.gameStartTime = gameState.lastUpdateTime = now;
+            gameState.gameStartTime = gameState.lastUpdateTime = gameState.waveStartTime = now;
             document.getElementById('startScreen').style.display = 'none';
         }
         function showNameEntry() {
@@ -1201,6 +1257,7 @@
                 const paused = now-gameState.pauseStarted;
                 gameState.gameStartTime += paused;
                 gameState.lastSpawnTime += paused;
+                gameState.waveStartTime += paused;
                 gameState.breakStartTime += paused;
                 gameState.blinkStartTime += paused;
                 gameState.lastUpdateTime = now;
@@ -1259,11 +1316,13 @@
         
         // Initialize top scores display
         updateTopScores();
+        updateHud();
         
         }); // End of DOMContentLoaded
     </script>
 </body>
 </html>
+
 
 
 
