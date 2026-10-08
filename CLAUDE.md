@@ -13,7 +13,7 @@ open index.html                 # opens directly via file:// — works, no serve
 python3 -m http.server 8000     # optional: serve at http://localhost:8000
 ```
 
-Run `node check.cjs` for game logic regression checks. Browser rendering and real touch interactions still need manual verification. The responsive grid scales the 800×800 canvas to the viewport, places statistics above it and controls/leaderboard below it. Pointer buttons support held rotation; Fire, Start, record score and restart use clickable buttons.
+Run `node check.cjs` for game logic regression checks. Browser rendering and real touch interactions still need manual verification. The responsive grid scales the 800×800 canvas to the viewport, places statistics above it and wave progress/timing plus controls below it. The leaderboard is inside the start screen and is not shown during play. Pointer buttons support held rotation; Fire, Start, record score and restart use clickable buttons.
 
 ## Architecture
 
@@ -28,6 +28,8 @@ All script code lives inside a single `DOMContentLoaded` callback. Nothing is at
 **Geometry.** Fixed 800×800 canvas; `gameRadius = 380` is the spawn ring and bullet despawn boundary, `castleRadius = 60` is the breach threshold. Monsters spawn at a random angle on the ring and steer toward the center. Everything is polar math around `centerX/centerY`.
 
 **The beam is visibility only, not a weapon.** `Monster.update()` sets `this.visible` by comparing the monster's angle to `gameState.beamAngle` within `beamWidth / 2`. A `reveal` value fades enemies over 0.35s after they leave the beam. Bullet–monster collision is plain distance checking and ignores visibility entirely — you can kill what you can't see.
+
+**Wave HUD.** The bottom panel shows wave progress (resolved enemies / planned wave size), enemies remaining, elapsed wave time, and time until the next planned spawn. There is no fixed wave-end deadline; after all spawns it says All enemies spawned. waveStartTime resets each wave and shifts with hidden-page pauses; waveElapsed freezes in intermission and defeat. Timing is display state, not a change to wave completion rules.
 
 **Waves.** `level` is the wave index. Wave 1 has 5 enemies; each wave adds 2 up to 25. `waveSpawned` counts spawns within this wave. The first enemy of each wave arrives after 2.5s, and only the first enemy of the run is placed in the beam. Spawn spacing starts at 2.6s, decreases 0.15s per wave, and bottoms at 0.8s. Wave completion requires all planned enemies to have spawned and all monsters to be resolved. Enemy speed is 0.65 + 0.1 per additional wave (pixels per 60fps frame). Curved paths and armored enemies start at wave 3; heavies start at wave 5. Armored enemies have 2 HP and 85% speed; heavies 3 HP and 65% speed.
 
