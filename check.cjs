@@ -5,6 +5,7 @@ const html = fs.readFileSync(__dirname + '/index.html', 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 new vm.Script(script);
 const storage = new Map();
+(async () => {
 function boot(blockStorage = false, withAudio = false) {
     let now = 100000;
     const events = {};
@@ -25,15 +26,16 @@ function boot(blockStorage = false, withAudio = false) {
     const sandbox = {console: {log(){},error(){}}, Math, Date: class extends Date {static now(){ return now; }},
         HTMLInputElement: Input, HTMLButtonElement: Button, alert(){}, requestAnimationFrame(){},
         localStorage: {getItem(k){if(blockStorage)throw Error();return storage.get(k)||null;},setItem(k,v){if(blockStorage)throw Error();storage.set(k,v);}},
+        navigator: {audioSession:{type:'ambient'}},
         document: {getElementById: id => elements[id],addEventListener: (type, fn) => {events[type] = fn;}},
         window: {addEventListener: (type, fn) => {events[type] = fn;}}};
     sandbox.document.createElement = () => ({width:800,height:800,getContext:()=>ctx});
-    const audio = {started:0, resumed:0, suspended:0, disconnected:0, pans:[], oscillators:[], gains:[]};
+    const audio = {started:0, resumed:0, suspended:0, disconnected:0, pans:[], oscillators:[], gains:[], contexts:[]};
     if (withAudio) {
         const param = () => ({value:0,setValueAtTime(value){this.value=value;},exponentialRampToValueAtTime(){}});
         const node = () => ({connect(){},disconnect(){audio.disconnected++;}});
         sandbox.window.AudioContext = class {
-            constructor(){this.state='running';this.currentTime=0;this.destination={};}
+            constructor(){this.state='running';this.currentTime=0;this.destination={};audio.contexts.push(this);}
             resume(){this.state='running';audio.resumed++;return Promise.resolve();}
             suspend(){this.state='suspended';audio.suspended++;return Promise.resolve();}
             createGain(){const gain={...node(),gain:param()};audio.gains.push(gain);return gain;}
@@ -178,11 +180,41 @@ assert.equal(boot().elements.soundBtn.textContent,'Sound off');
 sound.elements.soundBtn.listeners.click();assert.equal(sound.audio.gains[0].gain.value,.18);
 sound.sandbox.document.hidden=true;sound.events.visibilitychange();assert.equal(sound.audio.suspended,1);
 sound.t.playSound('step');assert.equal(sound.audio.started,13);
-sound.sandbox.document.hidden=false;sound.events.visibilitychange();assert.equal(sound.audio.resumed,3);
+sound.sandbox.document.hidden=false;sound.events.visibilitychange();assert.equal(sound.audio.resumed,4);
+assert.equal(sound.sandbox.navigator.audioSession.type,'playback','Use the media session instead of iOS ambient audio');
+const interrupted=sound.audio.contexts[0];interrupted.state='interrupted';interrupted.onstatechange();
+assert(sound.elements.soundStatus.textContent.includes('Test sound'));
+const resumedBefore=sound.audio.resumed;sound.elements.fireBtn.listeners.click();
+assert.equal(sound.audio.resumed,resumedBefore+1);assert.equal(interrupted.state,'running');
+sound.elements.soundBtn.listeners.click();assert.equal(storage.get('castle-defense-muted'),'true');
+const beforeTest=sound.audio.started;
+await sound.elements.testSoundBtn.listeners.click();
+assert.equal(storage.get('castle-defense-muted'),'false');assert.equal(sound.audio.started,beforeTest+2);
+assert(sound.elements.soundStatus.textContent.includes('Test chime'));
+// Do not attempt the chime until asynchronous resume completes.
+interrupted.state='suspended';let finishResume;
+interrupted.resume=()=>new Promise(resolve=>{finishResume=()=>{interrupted.state='running';resolve();};});
+const pendingTest=sound.elements.testSoundBtn.listeners.click();
+const pendingVoices=sound.audio.started;
+await Promise.resolve();assert.equal(sound.audio.started,pendingVoices);
+finishResume();await pendingTest;assert.equal(sound.audio.started,pendingVoices+2);
+interrupted.state='interrupted';interrupted.resume=()=>Promise.reject(Error('blocked'));
+const blockedVoices=sound.audio.started;await sound.elements.testSoundBtn.listeners.click();
+assert.equal(sound.audio.started,blockedVoices);assert(sound.elements.soundStatus.textContent.includes('Tap Test sound'));
+interrupted.state='closed';await sound.elements.testSoundBtn.listeners.click();
+assert.equal(sound.audio.contexts.length,2,'Recreate a closed context');
+// A denied audio session setting should still leave normal Web Audio usable.
+const denied=boot(false,true);
+Object.defineProperty(denied.sandbox.navigator.audioSession,'type',{set(){throw Error('denied');}});
+denied.t.startGame();assert.equal(denied.audio.contexts.length,1);
+const unsupported=boot();assert.equal(unsupported.elements.testSoundBtn.disabled,true);
 assert.equal(boot(true).t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','broken json');assert.equal(boot().t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','[{"name":"bad"}]');assert.equal(boot().t.state.highScores.length,0);
 console.log('PASS: existing controls/combat/scoring plus finite waves, survivor gating, repairs, break/choice gating, one capped upgrade, expanded ammo, reset, pause accounting, bounded/panned audio, mute persistence and hidden-page audio suspension.');
+console.log('PASS: iOS playback session, gesture retry after interruption, unmute/test chime, async/denied resume, closed-context recovery, unsupported audio and denied session setting.');
+})().catch(error => { console.error(error);process.exitCode=1; });
+
 
 
 
