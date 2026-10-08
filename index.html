@@ -227,18 +227,42 @@
             #ui-left, #ui-right { font-size: 12px; }
             #touchControls button { flex: 1; padding: 12px 8px; }
         }
+        body { background: radial-gradient(ellipse at top, #182a3c, #060d17 70%); color: #e3edf5; }
+        #gameContainer { max-width: 720px; gap: 14px; }
+        #gameCanvas { border-color: #344c60; box-shadow: 0 0 70px #050b14, 0 0 0 7px #111f2d; }
+        #ui-left, #ui-right { background: #101e2bdd; padding: 12px; border: 1px solid #304455;
+            border-radius: 12px; line-height: 1.7; color: #a9bdcf; }
+        #ui-left span, #ui-right span { color: #f4dca3; font-weight: bold; font-variant-numeric: tabular-nums; }
+        #topScores { background: #101e2b; border-color: #304455; border-radius: 12px; }
+        #topScores h3 { color: #e8c887; text-transform: uppercase; letter-spacing: 2px; }
+        #instructions { color: #91a8bc; font-size: 13px; line-height: 1.7; }
+        button { background: linear-gradient(#263e52, #172b3e); border-color: #4d6b80;
+            font-weight: bold; box-shadow: 0 3px 0 #050d16; }
+        button:hover { filter: brightness(1.2); }
+        button:focus-visible { outline: 3px solid #edce83; outline-offset: 3px; }
+        #fireBtn, #startBtn { background: linear-gradient(#e4bf72, #b5823e); color: #151c26; border-color: #f0d9a2; }
+        #touchControls { position: sticky; bottom: 8px; z-index: 5; background: #091522ed;
+            padding: 8px; border-radius: 12px; }
+        #startScreen { background: radial-gradient(ellipse at center, #142638f5, #040b14fb); }
+        #startScreen h1 { color: #ecd5a4; font-family: Georgia, serif; letter-spacing: 1px; }
+        #startScreen .controls { color: #9fb8cb; margin-top: 22px; font-size: 16px; }
+        #startScreen p { color: #b1c7d8; max-width: 420px; line-height: 1.5; }
+        #nameEntry { background: #0c1b2bee; border-color: #c8aa73; }
+        #gameOver { color: #efb1a2; border: 1px solid #aa6859; border-radius: 12px; }
+        @media (prefers-reduced-motion: reduce) { button:hover { filter: none; } }
     </style>
 </head>
 <body>
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="800"></canvas>
         <div id="ui-left">
-            <div>Level: <span id="level">1</span></div>
+            <div>Level <span id="level">1</span> · Castle <span id="health" aria-label="Castle health">3 / 3</span></div>
             <div>Time to Next Level: <span id="timer">60</span>s</div>
         </div>
         <div id="ui-right">
             <div>Monsters Attacking: <span id="attacking">0</span></div>
             <div>Monsters Killed: <span id="kills">0</span></div>
+            <div>Ammo ready: <span id="ammo">3 / 3</span></div>
         </div>
         <div id="gameOver">
             GAME OVER!<br>
@@ -274,14 +298,14 @@
 
     <div id="startScreen">
         <h1>Castle Defense: Night Siege</h1>
-        <p>Press Enter or tap Start to play</p>
+        <p>Keep the light moving. Find what lurks in the dark.<br>Protect the castle through the night.</p>
         <button id="startBtn">Start game</button>
         <div class="controls">
             Use LEFT/RIGHT arrows to rotate<br>
             SPACE to shoot<br>
             <strong>Maximum 3 bullets at once!</strong><br>
             Wait for bullets to hit or leave before shooting again<br>
-            Defend your castle from the monsters!
+            Three breaches destroy your castle.<br>Press Enter or tap Start to begin.
         </div>
     </div>
 
@@ -305,7 +329,12 @@
                 kills: 0,
                 levelTimer: 60,
                 monsterSpawnTimer: 10,
-                monsterSpawnInterval: 10,
+                monsterSpawnInterval: 6,
+                firstSpawn: true,
+                health: 3,
+                damageFlash: 0,
+                muzzleFlash: 0,
+                particles: [],
                 gameOver: false,
                 gameStarted: false,
                 beamAngle: -Math.PI / 2,
@@ -347,21 +376,21 @@
         
         class Monster {
             constructor() {
-                const angle = Math.random() * 2 * Math.PI;
+                const angle = gameState.monsterCount === 0 ? gameState.beamAngle : Math.random() * 2 * Math.PI;
                 this.x = centerX + Math.cos(angle) * gameRadius;
                 this.y = centerY + Math.sin(angle) * gameRadius;
-                this.speed = 0.3 + (gameState.level - 1) * 0.1;
+                this.speed = 0.65 + (gameState.level - 1) * 0.1;
                 this.radius = 15;
                 
                 // Determine monster type based on level and spawn count
                 gameState.monsterCount = (gameState.monsterCount || 0) + 1;
                 
-                if (gameState.level >= 7 && gameState.monsterCount % 3 === 0) {
-                    // Every third monster from level 7 has 3 HP
+                if (gameState.level >= 5 && gameState.monsterCount % 3 === 0) {
+                    // Every third monster from level 5 has 3 HP
                     this.hp = 3;
                     this.monsterType = 'heavy';
-                } else if (gameState.level >= 5 && gameState.monsterCount % 2 === 0) {
-                    // Every second monster from level 5 has 2 HP
+                } else if (gameState.level >= 3 && gameState.monsterCount % 2 === 0) {
+                    // Every second monster from level 3 has 2 HP
                     this.hp = 2;
                     this.monsterType = 'armored';
                 } else {
@@ -369,6 +398,10 @@
                     this.monsterType = 'normal';
                 }
                 
+                this.radius = this.monsterType === 'heavy' ? 22 : this.monsterType === 'armored' ? 18 : 13;
+                if (this.monsterType === 'heavy') this.speed *= 0.65;
+                if (this.monsterType === 'armored') this.speed *= 0.85;
+                this.reveal = 0;
                 this.maxHp = this.hp;
                 this.visible = false;
                 this.atCastle = false;
@@ -395,21 +428,23 @@
                 const dy = centerY - this.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 
-                // Check if reached castle BEFORE moving
+                // Consume each breached monster once. Only the third breach ends the run.
                 if (dist < castleRadius + this.radius) {
-                    this.visible = true; // Make monster visible when it reaches castle
-                    this.atCastle = true; // Mark that this monster breached the castle
-                    
-                    if (!gameState.blinkingPhase) {
-                        // Start blinking phase
-                        gameState.blinkingPhase = true;
-                        gameState.blinkStartTime = Date.now();
-                        gameState.survivalTime = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
+                    if (!this.atCastle) {
+                        this.atCastle = true;
+                        gameState.health = Math.max(0, gameState.health - 1);
+                        gameState.damageFlash = 0.6;
+                        spawnParticles(this.x, this.y, '#ed957c', 22);
+                        updateHud();
+                        if (gameState.health === 0) {
+                            gameState.blinkingPhase = true;
+                            gameState.blinkStartTime = Date.now();
+                            gameState.survivalTime = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
+                        }
                     }
-                    
-                    return true; // Keep the monster in the array so it can be drawn
+                    return false;
                 }
-                
+
                 // Calculate base movement toward castle - now time-based
                 const speedPerSecond = this.speed * 60; // Convert to pixels per second (assuming 60fps baseline)
                 let moveX = (dx / dist) * speedPerSecond * deltaTime;
@@ -452,75 +487,54 @@
                 while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
                 
                 this.visible = Math.abs(angleDiff) < gameState.beamWidth / 2;
+                this.reveal = this.visible ? 1 : Math.max(0, this.reveal - deltaTime / 0.35);
                 
                 return true;
             }
             
             draw() {
-                // Always draw if visible
-                if (this.visible) {
-                    ctx.save();
-                    ctx.globalAlpha = 0.9;
-                    
-                    // Determine color based on monster type and state
-                    if (this.atCastle && (gameState.blinkingPhase || gameState.gameOver)) {
-                        // Blink bright red for the monster that breached
-                        const blinkPhase = Math.floor(Date.now() / 200) % 2;
-                        ctx.fillStyle = blinkPhase ? '#ff0000' : '#ffff00';
-                    } else if (this.hitFlash > 0) {
-                        // Flash white when hit (decayed in update(), not here)
-                        ctx.fillStyle = '#ffffff';
-                    } else if (this.monsterType === 'heavy') {
-                        // Heavy armored monsters (3 HP) - Green shades
-                        if (this.hp === 3) {
-                            ctx.fillStyle = '#006400'; // Dark green
-                        } else if (this.hp === 2) {
-                            ctx.fillStyle = '#228b22'; // Forest green
-                        } else {
-                            ctx.fillStyle = '#90ee90'; // Light green
-                        }
-                    } else if (this.monsterType === 'armored') {
-                        // Armored monsters (2 HP) - Purple shades
-                        ctx.fillStyle = this.hp === 2 ? '#4b0082' : '#9370db';
-                    } else {
-                        // Normal monsters - Red shades
-                        ctx.fillStyle = this.hp === 1 ? '#8b0000' : '#cd5c5c';
+                if (this.reveal <= 0) return;
+                ctx.save();
+                ctx.globalAlpha = this.reveal;
+                ctx.translate(this.x, this.y);
+                ctx.rotate(Math.atan2(centerY - this.y, centerX - this.x));
+                const r = this.radius;
+                const color = this.monsterType === 'heavy' ? '#719b80' : this.monsterType === 'armored' ? '#a797c9' : '#c77d6c';
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff4d6' : color;
+                ctx.strokeStyle = '#1a202b'; ctx.lineWidth = 3;
+                ctx.beginPath();
+                if (this.monsterType === 'heavy') {
+                    // Broad jagged shell and horns.
+                    ctx.moveTo(r, 0); ctx.lineTo(r * .65, -r); ctx.lineTo(-r * .7, -r);
+                    ctx.lineTo(-r, -r * .5); ctx.lineTo(-r, r * .5); ctx.lineTo(-r * .7, r);
+                    ctx.lineTo(r * .65, r);
+                } else if (this.monsterType === 'armored') {
+                    // Hexagonal plate distinguishes armor from the narrow runner.
+                    for (let i = 0; i < 6; i++) {
+                        const a = i * Math.PI / 3;
+                        if (i === 0) ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+                        else ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
                     }
-                    
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
-                    ctx.fill();
-                    
-                    // Monster eyes - different colors for different types
-                    if (this.monsterType === 'heavy') {
-                        ctx.fillStyle = '#00ff00'; // Bright green eyes
-                    } else if (this.monsterType === 'armored') {
-                        ctx.fillStyle = '#ffff00'; // Yellow eyes
-                    } else {
-                        ctx.fillStyle = '#ff0000'; // Red eyes
+                } else {
+                    ctx.moveTo(r + 6, 0); ctx.lineTo(-r, -r * .7);
+                    ctx.lineTo(-r * .55, 0); ctx.lineTo(-r, r * .7);
+                }
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#ffe3a3'; ctx.shadowColor = '#ffc170'; ctx.shadowBlur = 8;
+                ctx.fillRect(r * .3, -6, 4, 3); ctx.fillRect(r * .3, 3, 4, 3);
+                ctx.shadowBlur = 0;
+                ctx.restore();
+                if (this.maxHp > 1) {
+                    ctx.save(); ctx.globalAlpha = this.reveal;
+                    for (let i = 0; i < this.maxHp; i++) {
+                        ctx.fillStyle = i < this.hp ? '#e7ca89' : '#334354';
+                        ctx.fillRect(this.x - this.maxHp * 4 + i * 8, this.y - r - 10, 6, 3);
                     }
-                    
-                    ctx.beginPath();
-                    ctx.arc(this.x - 5, this.y - 3, 3, 0, 2 * Math.PI);
-                    ctx.arc(this.x + 5, this.y - 3, 3, 0, 2 * Math.PI);
-                    ctx.fill();
-                    
-                    // Show HP indicator for multi-hit monsters
-                    if ((this.monsterType === 'armored' || this.monsterType === 'heavy') && this.hp > 0 && !this.atCastle) {
-                        const hpColor = this.hp === this.maxHp ? '#00ff00' : 
-                                       this.hp === 2 ? '#ffff00' : '#ff0000';
-                        ctx.fillStyle = hpColor;
-                        ctx.fillRect(this.x - 10, this.y - 20, 20 * (this.hp / this.maxHp), 3);
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 1;
-                        ctx.strokeRect(this.x - 10, this.y - 20, 20, 3);
-                    }
-                    
                     ctx.restore();
                 }
             }
         }
-        
+
         class Bullet {
             constructor(angle) {
                 this.x = centerX + Math.cos(angle) * (castleRadius + 20);
@@ -528,6 +542,7 @@
                 this.vx = Math.cos(angle) * 8;
                 this.vy = Math.sin(angle) * 8;
                 this.radius = 4;
+                gameState.muzzleFlash = 0.09;
             }
             
             update(deltaTime) {
@@ -540,10 +555,13 @@
             }
             
             draw() {
-                ctx.fillStyle = '#ffff00';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
-                ctx.fill();
+                ctx.save();
+                ctx.strokeStyle = '#e9bd73'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(this.x - this.vx * 2.5, this.y - this.vy * 2.5);
+                ctx.lineTo(this.x, this.y); ctx.stroke();
+                ctx.fillStyle = '#fff1bb'; ctx.shadowColor = '#f7c576'; ctx.shadowBlur = 12;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI); ctx.fill();
+                ctx.restore();
             }
         }
         
@@ -575,70 +593,97 @@
             }
         }
         
+        // Cache terrain once; effects are drawn separately and do not allocate per frame.
+        const terrain = document.createElement('canvas');
+        terrain.width = terrain.height = 800;
+        const ground = terrain.getContext('2d');
+        const groundLight = ground.createRadialGradient(400, 400, 50, 400, 400, 420);
+        groundLight.addColorStop(0, '#243641'); groundLight.addColorStop(1, '#070f1b');
+        ground.fillStyle = groundLight; ground.fillRect(0, 0, 800, 800);
+        for (let i = 0; i < 700; i++) {
+            const x = Math.random()*800, y = Math.random()*800;
+            ground.fillStyle = i % 3 ? '#9caeab0c' : '#030a1460';
+            ground.fillRect(x, y, 1 + Math.random()*4, 1 + Math.random()*3);
+        }
+        for (let i = 0; i < 32; i++) {
+            const a = Math.random()*Math.PI*2, d = 120 + Math.random()*245;
+            ground.save(); ground.translate(400+Math.cos(a)*d, 400+Math.sin(a)*d); ground.rotate(a);
+            ground.fillStyle = '#25323d'; ground.fillRect(-9,-4,18,8);
+            ground.fillStyle = '#3a4750'; ground.fillRect(-9,-4,18,2); ground.restore();
+        }
         function drawCastle() {
-            // Blink castle during blinking phase or if game over
-            if (gameState.blinkingPhase || gameState.gameOver) {
-                const blinkPhase = Math.floor(Date.now() / 200) % 2;
-                ctx.fillStyle = blinkPhase ? '#ff0000' : '#444';
-            } else {
-                ctx.fillStyle = '#444';
-            }
-            
-            // Castle base
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, castleRadius, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            // Castle details
-            ctx.fillStyle = (gameState.blinkingPhase || gameState.gameOver) && Math.floor(Date.now() / 200) % 2 ? '#ff6666' : '#555';
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * 2 * Math.PI;
-                const x = centerX + Math.cos(angle) * (castleRadius - 10);
-                const y = centerY + Math.sin(angle) * (castleRadius - 10);
-                ctx.beginPath();
-                ctx.arc(x, y, 8, 0, 2 * Math.PI);
-                ctx.fill();
-            }
-            
-            // Machine gun
             ctx.save();
             ctx.translate(centerX, centerY);
-            ctx.rotate(gameState.beamAngle - Math.PI / 2); // Subtract 90 degrees instead to align properly
-            
-            // Gun base at center
-            ctx.fillStyle = '#666';
-            ctx.fillRect(-8, -8, 16, 16);
-            
-            // Gun barrel pointing outward along beam center, extending beyond castle
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-4, 0, 8, 70); // Extended from 45 to 70 to go beyond castle radius
-            ctx.fillRect(-3, 70, 6, 10);
-            
+            ctx.shadowColor = '#000'; ctx.shadowBlur = 18;
+            ctx.fillStyle = '#101e29'; ctx.beginPath(); ctx.arc(0, 0, 65, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = gameState.damageFlash > 0 ? '#8e4f48' : '#586c79';
+            ctx.strokeStyle = '#a3afb0'; ctx.lineWidth = 2;
+            ctx.fillRect(-42,-42,84,84); ctx.strokeRect(-42,-42,84,84);
+            for (const x of [-40,40]) for (const y of [-40,40]) {
+                ctx.fillRect(x-13,y-13,26,26); ctx.strokeRect(x-13,y-13,26,26);
+                ctx.fillStyle = '#263b4b'; ctx.fillRect(x-6,y-6,12,12);
+                ctx.fillStyle = gameState.damageFlash > 0 ? '#8e4f48' : '#586c79';
+            }
+            ctx.fillStyle = '#edc883'; ctx.fillRect(-27,-20,5,8); ctx.fillRect(22,-20,5,8);
+            if (gameState.health < 3) {
+                ctx.strokeStyle = '#17222d'; ctx.lineWidth = 3; ctx.beginPath();
+                ctx.moveTo(-40,20); ctx.lineTo(-26,9); ctx.lineTo(-29,-7); ctx.stroke();
+            }
+            if (gameState.health < 2) {
+                ctx.beginPath(); ctx.moveTo(42,17); ctx.lineTo(20,2); ctx.lineTo(31,-16); ctx.stroke();
+            }
+            ctx.rotate(gameState.beamAngle);
+            ctx.fillStyle = '#b3bdba'; ctx.fillRect(0,-5,80,10);
+            ctx.fillStyle = '#273d4c'; ctx.fillRect(65,-7,15,14);
+            ctx.fillStyle = '#768b97'; ctx.beginPath(); ctx.arc(0,0,16,0,Math.PI*2); ctx.fill();
+            if (gameState.muzzleFlash > 0) {
+                ctx.fillStyle = '#ffe9a6'; ctx.shadowColor = '#ffbf55'; ctx.shadowBlur = 25;
+                ctx.beginPath(); ctx.moveTo(78,-9); ctx.lineTo(103,0); ctx.lineTo(78,9); ctx.fill();
+            }
             ctx.restore();
         }
-        
         function drawBeam() {
             ctx.save();
-            ctx.globalAlpha = 0.5;
-            
-            // Create gradient for beam
-            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, gameRadius);
-            gradient.addColorStop(0, 'rgba(255, 255, 200, 0.8)');
-            gradient.addColorStop(0.7, 'rgba(255, 255, 200, 0.4)');
-            gradient.addColorStop(1, 'rgba(255, 255, 200, 0.2)');
-            
+            const gradient = ctx.createRadialGradient(centerX, centerY, 45, centerX, centerY, gameRadius);
+            gradient.addColorStop(0, 'rgba(255,234,180,.26)');
+            gradient.addColorStop(.65, 'rgba(224,234,209,.13)');
+            gradient.addColorStop(1, 'rgba(195,216,219,0)');
             ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, gameRadius, 
-                gameState.beamAngle - gameState.beamWidth / 2, 
-                gameState.beamAngle + gameState.beamWidth / 2);
-            ctx.closePath();
-            ctx.fill();
-            
+            // Nested wedges feather the edges without blur filters on mobile.
+            for (let i = 0; i < 5; i++) {
+                const width = gameState.beamWidth * (1.18 - i*.1);
+                ctx.globalAlpha = .25;
+                ctx.beginPath(); ctx.moveTo(centerX,centerY);
+                ctx.arc(centerX,centerY,gameRadius,gameState.beamAngle-width/2,gameState.beamAngle+width/2);
+                ctx.closePath(); ctx.fill();
+            }
             ctx.restore();
         }
-        
+        function spawnParticles(x,y,color,count) {
+            for (let i=0;i<count;i++) {
+                const angle = Math.random()*Math.PI*2, speed = 30+Math.random()*100;
+                gameState.particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
+                    life:.25+Math.random()*.4,color});
+            }
+            gameState.particles = gameState.particles.slice(-160);
+        }
+        function updateEffects(dt) {
+            gameState.muzzleFlash = Math.max(0,gameState.muzzleFlash-dt);
+            gameState.damageFlash = Math.max(0,gameState.damageFlash-dt);
+            gameState.particles = gameState.particles.filter(p => {
+                p.life -= dt; p.x += p.vx*dt; p.y += p.vy*dt; return p.life > 0;
+            });
+        }
+        function updateHud() {
+            document.getElementById('health').textContent = `${gameState.health} / 3`;
+            document.getElementById('ammo').textContent = `${3-gameState.bullets.length} / 3`;
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('kills').textContent = gameState.kills;
+            document.getElementById('attacking').textContent = gameState.monsters.length;
+            document.getElementById('timer').textContent = Math.ceil(gameState.levelTimer);
+        }
+
         function updateGame() {
             if (!gameState.gameStarted || gameState.gameOver) return;
             
@@ -648,11 +693,12 @@
             // monsters past the castle and jump bullets straight through their hitboxes
             const deltaTime = Math.min(MAX_DELTA_TIME, (now - gameState.lastUpdateTime) / 1000);
             gameState.lastUpdateTime = now;
+            updateEffects(deltaTime);
             
             // Handle blinking phase
             if (gameState.blinkingPhase) {
                 const blinkDuration = (now - gameState.blinkStartTime) / 1000;
-                if (blinkDuration >= 5) {
+                if (blinkDuration >= 1.2) {
                     // End blinking phase and show game over
                     gameState.blinkingPhase = false;
                     gameState.gameOver = true;
@@ -678,8 +724,9 @@
             }
             
             // Spawn monsters (only if game not over)
-            if (!gameState.gameOver && (now - gameState.lastSpawnTime) / 1000 > gameState.monsterSpawnInterval) {
+            if (!gameState.gameOver && (now - gameState.lastSpawnTime) / 1000 > (gameState.firstSpawn ? 2.5 : gameState.monsterSpawnInterval)) {
                 gameState.monsters.push(new Monster());
+                gameState.firstSpawn = false;
                 gameState.lastSpawnTime = now;
             }
             
@@ -704,6 +751,8 @@
             // Update monsters
             gameState.monsters = gameState.monsters.filter(monster => monster.update(deltaTime));
             
+            if (gameState.blinkingPhase) { updateHud(); return; }
+
             // Update bullets
             gameState.bullets = gameState.bullets.filter(bullet => bullet.update(deltaTime));
             
@@ -719,6 +768,7 @@
                         
                         // Damage the monster
                         monster.hp--;
+                        spawnParticles(monster.x,monster.y,monster.hp > 0 ? '#eed6a5' : '#c9836f',monster.hp > 0 ? 7 : 15);
                         
                         if (monster.hp <= 0) {
                             // Monster killed
@@ -738,20 +788,15 @@
             // Update bouncing bullets
             gameState.bouncingBullets = gameState.bouncingBullets.filter(bullet => bullet.update(deltaTime));
             
-            // Update UI
-            document.getElementById('level').textContent = gameState.level;
-            document.getElementById('kills').textContent = gameState.kills;
-            document.getElementById('attacking').textContent = gameState.monsters.length;
-            document.getElementById('timer').textContent = Math.ceil(gameState.levelTimer);
+            updateHud();
         }
         
         function draw() {
             // Clear canvas
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(terrain,0,0);
             
             // Draw game boundary
-            ctx.strokeStyle = '#222';
+            ctx.strokeStyle = '#344958';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(centerX, centerY, gameRadius, 0, 2 * Math.PI);
@@ -769,8 +814,21 @@
             // Draw bouncing bullets
             gameState.bouncingBullets.forEach(bullet => bullet.draw());
             
-            // Draw castle
+            for (const p of gameState.particles) {
+                ctx.globalAlpha = Math.min(1,p.life*3); ctx.fillStyle = p.color;
+                ctx.fillRect(p.x,p.y,3,3);
+            }
+            ctx.globalAlpha = 1;
+            // Faint stationary mist ribbons leave enemy visibility controlled by the beam.
+            ctx.strokeStyle = '#9dbfce08'; ctx.lineWidth = 13;
+            for (let i=0;i<4;i++) {
+                ctx.beginPath(); ctx.arc(400,400,145+i*53,.3+i,1.6+i); ctx.stroke();
+            }
             drawCastle();
+            if (gameState.damageFlash > 0) {
+                ctx.strokeStyle = `rgba(235,121,93,${gameState.damageFlash*.7})`;
+                ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(400,400,380,0,Math.PI*2); ctx.stroke();
+            }
         }
         
         function gameLoop() {
@@ -788,6 +846,7 @@
             document.getElementById('kills').textContent = '0';
             document.getElementById('attacking').textContent = '0';
             document.getElementById('timer').textContent = '60';
+            updateHud();
 
             // Hide all game over screens and show start screen
             document.getElementById('gameOver').style.display = 'none';
@@ -939,6 +998,7 @@
         document.getElementById('fireBtn').addEventListener('click', () => {
             if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && gameState.bullets.length < 3) {
                 gameState.bullets.push(new Bullet(gameState.beamAngle));
+                updateHud();
             }
         });
 
@@ -970,4 +1030,5 @@
     </script>
 </body>
 </html>
+
 
