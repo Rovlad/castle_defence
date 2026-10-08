@@ -123,6 +123,10 @@ for(let i=0;i<5;i++) {
 waves.t.state.health=1;
 waves.advance(16);waves.t.updateGame();
 assert.equal(waves.t.state.phase,'intermission');assert.equal(waves.t.state.health,2);
+assert.equal(waves.elements.waveResolved.textContent,'5 / 5');
+assert.equal(waves.elements.waveProgress.value,5);
+assert.equal(waves.elements.nextArrival.textContent,'—');
+const displayedWaveTime=waves.elements.waveTime.textContent;
 assert.equal(waves.t.state.bullets.length,0);
 const clearedAt = waves.sandbox.Date.now();
 const combatTime = clearedAt-waves.t.state.gameStartTime;
@@ -132,7 +136,11 @@ waves.t.chooseUpgrade('ammo');assert.equal(waves.t.state.bulletLimit,4);
 const beamBefore=waves.t.state.beamWidth;waves.t.chooseUpgrade('beam');assert.equal(waves.t.state.beamWidth,beamBefore);
 waves.t.nextWave();assert.equal(waves.t.state.phase,'intermission');
 waves.advance(4200);waves.t.updateGame();assert.equal(waves.elements.nextWaveBtn.disabled,false);
+assert.equal(waves.elements.waveTime.textContent,displayedWaveTime,'Wave timer freezes in resupply');
 waves.advance(10000);waves.t.nextWave();
+assert.equal(waves.elements.waveTime.textContent,'0:00');
+assert.equal(waves.elements.waveResolved.textContent,'0 / 7');
+assert.equal(waves.elements.nextArrival.textContent,'0:03');
 assert.equal(waves.sandbox.document.activeElement,waves.elements.fireBtn);
 waves.pressSpace();
 assert.equal(waves.t.state.bullets.length,1,'Space must fire after nextWave focuses the Fire button');
@@ -151,6 +159,7 @@ waves.sandbox.document.hidden=true;waves.events.visibilitychange();
 waves.advance(30000);waves.t.updateGame();assert.equal(waves.t.state.waveSpawned,0);
 waves.sandbox.document.hidden=false;waves.events.visibilitychange();
 assert.equal(waves.t.state.lastSpawnTime,spawnBefore+30000);
+waves.t.updateGame();assert.equal(waves.elements.waveTime.textContent,'0:00','Wave timer excludes hidden-page pause');
 assert.equal(waves.sandbox.Date.now()-waves.t.state.gameStartTime,combatTime);
 // Upgrade maxima do not soft-lock a completed run.
 waves.t.state.beamWidth=Math.PI/2;waves.t.state.rotationSpeed=5.4;waves.t.state.bulletLimit=6;
@@ -214,6 +223,7 @@ storage.set('castle-defense-scores-v1','[{"name":"bad"}]');assert.equal(boot().t
 console.log('PASS: existing controls/combat/scoring plus finite waves, survivor gating, repairs, break/choice gating, one capped upgrade, expanded ammo, reset, pause accounting, bounded/panned audio, mute persistence and hidden-page audio suspension.');
 console.log('PASS: iOS playback session, gesture retry after interruption, unmute/test chime, async/denied resume, closed-context recovery, unsupported audio and denied session setting.');
 })().catch(error => { console.error(error);process.exitCode=1; });
+
 
 
 
