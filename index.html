@@ -250,19 +250,31 @@
         #nameEntry { background: #0c1b2bee; border-color: #c8aa73; }
         #gameOver { color: #efb1a2; border: 1px solid #aa6859; border-radius: 12px; }
         @media (prefers-reduced-motion: reduce) { button:hover { filter: none; } }
+        #upgradePanel { position: fixed; inset: 0; background: #040b14e8; z-index: 100;
+            display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; overflow-y: auto; }
+        .upgrade-card { width: min(520px,100%); background: #122537; border: 1px solid #a28b5c;
+            border-radius: 18px; padding: 24px; box-sizing: border-box; text-align: center; }
+        .upgrade-card h2 { color: #ecd5a4; font-family: Georgia,serif; margin-top: 0; }
+        .upgrade-card p { color: #b1c7d8; line-height: 1.5; }
+        #upgradeChoices { display: grid; gap: 10px; margin: 18px 0; }
+        #upgradeChoices button { text-align: left; font-size: 16px; }
+        #upgradeChoices small { display: block; font-weight: normal; color: #b1c7d8; margin-top: 4px; }
+        button:disabled { opacity: .45; cursor: default; filter: none; }
+        #soundBtn { padding: 6px 12px; min-height: 36px; font-size: 13px; margin-top: 6px; }
     </style>
 </head>
 <body>
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="800"></canvas>
         <div id="ui-left">
-            <div>Level <span id="level">1</span> · Castle <span id="health" aria-label="Castle health">3 / 3</span></div>
-            <div>Time to Next Level: <span id="timer">60</span>s</div>
+            <div>Wave <span id="level">1</span> · Castle <span id="health" aria-label="Castle health">3 / 3</span></div>
+            <div>Remaining: <span id="remaining">5</span> · <span id="waveStatus">Hold the line</span></div>
         </div>
         <div id="ui-right">
             <div>Monsters Attacking: <span id="attacking">0</span></div>
             <div>Monsters Killed: <span id="kills">0</span></div>
             <div>Ammo ready: <span id="ammo">3 / 3</span></div>
+            <button id="soundBtn" aria-pressed="false">Sound on</button>
         </div>
         <div id="gameOver">
             GAME OVER!<br>
@@ -278,6 +290,20 @@
             <button id="fireBtn">Fire</button>
             <button id="rotateRightBtn" aria-label="Rotate right">Right ▶</button>
         </div>
+        <section id="upgradePanel" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle" tabindex="-1">
+            <div class="upgrade-card">
+                <h2 id="upgradeTitle">Wave complete</h2>
+                <p id="breakSummary"></p>
+                <p>Choose one upgrade for the rest of this run.</p>
+                <div id="upgradeChoices">
+                    <button id="beamUpgradeBtn">Wider searchlight<small>+5° visibility · maximum 90°</small></button>
+                    <button id="rotationUpgradeBtn">Faster turret<small>Turn faster to track approaching enemies · up to 6 upgrades</small></button>
+                    <button id="ammoUpgradeBtn">Extra ammunition<small>+1 bullet slot · maximum 6</small></button>
+                </div>
+                <p id="breakStatus" role="status" aria-live="polite"></p>
+                <button id="nextWaveBtn" disabled>Start next wave</button>
+            </div>
+        </section>
         <div id="nameEntry">
             <h2>Game Over!</h2>
             <div id="scoreDisplay"></div>
@@ -303,9 +329,9 @@
         <div class="controls">
             Use LEFT/RIGHT arrows to rotate<br>
             SPACE to shoot<br>
-            <strong>Maximum 3 bullets at once!</strong><br>
+            <strong>Start with 3 bullets at once!</strong><br>
             Wait for bullets to hit or leave before shooting again<br>
-            Three breaches destroy your castle.<br>Press Enter or tap Start to begin.
+            Clear each wave, then choose an upgrade.<br>Recover 1 castle health between waves.<br>Press Enter or tap Start to begin.
         </div>
     </div>
 
@@ -329,7 +355,16 @@
                 kills: 0,
                 levelTimer: 60,
                 monsterSpawnTimer: 10,
-                monsterSpawnInterval: 6,
+                monsterSpawnInterval: 2.6,
+                phase: 'combat',
+                waveSize: 5,
+                waveSpawned: 0,
+                breakStartTime: 0,
+                upgradeChosen: false,
+                rotationSpeed: 3,
+                bulletLimit: 3,
+                pauseStarted: null,
+                lastFootstepTime: 0,
                 firstSpawn: true,
                 health: 3,
                 damageFlash: 0,
@@ -435,6 +470,7 @@
                         gameState.health = Math.max(0, gameState.health - 1);
                         gameState.damageFlash = 0.6;
                         spawnParticles(this.x, this.y, '#ed957c', 22);
+                        playSound('breach');
                         updateHud();
                         if (gameState.health === 0) {
                             gameState.blinkingPhase = true;
@@ -543,6 +579,7 @@
                 this.vy = Math.sin(angle) * 8;
                 this.radius = 4;
                 gameState.muzzleFlash = 0.09;
+                playSound('shot');
             }
             
             update(deltaTime) {
@@ -593,6 +630,130 @@
             }
         }
         
+        let audioContext = null, masterGain = null, audioVoices = 0;
+        let muted = false;
+        try { muted = localStorage.getItem('castle-defense-muted') === 'true'; } catch {}
+        function updateSoundButton() {
+            const button = document.getElementById('soundBtn');
+            button.textContent = muted ? 'Sound off' : 'Sound on';
+            button.setAttribute('aria-pressed',String(muted));
+            button.setAttribute('aria-label',muted ? 'Enable sound' : 'Mute sound');
+        }
+        function unlockAudio() {
+            if (muted) return;
+            try {
+                const Audio = window.AudioContext || window.webkitAudioContext;
+                if (!Audio) return;
+                if (!audioContext) {
+                    audioContext = new Audio();
+                    masterGain = audioContext.createGain(); masterGain.gain.value = .18;
+                    masterGain.connect(audioContext.destination);
+                }
+                audioContext.resume().catch(() => {});
+            } catch { /* Unsupported or denied audio never interrupts play. */ }
+        }
+        function tone(frequency,duration,type,volume,pan=0,ending=frequency) {
+            if (muted || !audioContext || audioContext.state !== 'running' || document.hidden || audioVoices >= 12) return;
+            try {
+                const osc = audioContext.createOscillator(), gain = audioContext.createGain();
+                const panner = audioContext.createStereoPanner ? audioContext.createStereoPanner() : null;
+                const now = audioContext.currentTime;
+                osc.type = type; osc.frequency.setValueAtTime(frequency,now);
+                osc.frequency.exponentialRampToValueAtTime(Math.max(1,ending),now+duration);
+                gain.gain.setValueAtTime(volume,now);
+                gain.gain.exponentialRampToValueAtTime(.001,now+duration);
+                osc.connect(gain);
+                if (panner) { panner.pan.value = pan; gain.connect(panner); panner.connect(masterGain); }
+                else gain.connect(masterGain);
+                audioVoices++;
+                osc.onended = () => { audioVoices--; osc.disconnect(); gain.disconnect(); if (panner) panner.disconnect(); };
+                osc.start(now); osc.stop(now+duration);
+            } catch { /* Keep gameplay available if an audio node cannot be created. */ }
+        }
+        function playSound(kind,pan=0) {
+            if (kind === 'shot') tone(160,.09,'sawtooth',.28,0,45);
+            else if (kind === 'hit') tone(230,.08,'triangle',.25,0,70);
+            else if (kind === 'armor') tone(720,.13,'square',.09,0,310);
+            else if (kind === 'breach') tone(100,.45,'sawtooth',.32,0,28);
+            else if (kind === 'step') tone(60,.055,'triangle',.16,pan,35);
+            else if (kind === 'clear') { tone(440,.3,'sine',.16); tone(660,.4,'sine',.12); }
+            else if (kind === 'upgrade') tone(500,.2,'sine',.14,0,900);
+        }
+        document.getElementById('soundBtn').addEventListener('click', () => {
+            muted = !muted;
+            try { localStorage.setItem('castle-defense-muted',String(muted)); } catch {}
+            if (!muted) unlockAudio();
+            if (masterGain) masterGain.gain.setValueAtTime(muted ? 0 : .18,audioContext.currentTime);
+            updateSoundButton();
+        });
+        updateSoundButton();
+
+        function finishWave() {
+            if (gameState.phase !== 'combat' || gameState.blinkingPhase || gameState.gameOver) return;
+            gameState.phase = 'intermission';
+            gameState.breakStartTime = Date.now();
+            gameState.upgradeChosen = false;
+            gameState.bullets = []; gameState.bouncingBullets = [];
+            clearKeys();
+            const repaired = gameState.health < 3;
+            gameState.health = Math.min(3,gameState.health+1);
+            document.getElementById('upgradeTitle').textContent = `Wave ${gameState.level} cleared`;
+            document.getElementById('breakSummary').textContent = repaired ? 'Resupply: one castle health restored.' : 'Resupply: castle at full health.';
+            document.getElementById('beamUpgradeBtn').disabled = gameState.beamWidth >= Math.PI/2-.001;
+            document.getElementById('rotationUpgradeBtn').disabled = gameState.rotationSpeed >= 5.4-.001;
+            document.getElementById('ammoUpgradeBtn').disabled = gameState.bulletLimit >= 6;
+            if (gameState.beamWidth >= Math.PI/2-.001 && gameState.rotationSpeed >= 5.4-.001 && gameState.bulletLimit >= 6) {
+                gameState.upgradeChosen = true;
+                document.getElementById('breakSummary').textContent += ' All upgrades are at maximum.';
+            }
+            document.getElementById('upgradePanel').style.display = 'flex';
+            updateBreak(); updateHud(); playSound('clear');
+            const available = ['beamUpgradeBtn','rotationUpgradeBtn','ammoUpgradeBtn'].find(id => !document.getElementById(id).disabled);
+            document.getElementById(available || 'upgradePanel').focus();
+        }
+        function updateBreak() {
+            const remaining = Math.max(0,Math.ceil(4-(Date.now()-gameState.breakStartTime)/1000));
+            const ready = remaining === 0 && gameState.upgradeChosen;
+            const nextButton = document.getElementById('nextWaveBtn');
+            const newlyReady = ready && nextButton.disabled;
+            nextButton.disabled = !ready;
+            if (newlyReady) nextButton.focus();
+            document.getElementById('breakStatus').textContent = remaining ?
+                `Resupply: ${remaining}s${gameState.upgradeChosen ? ' · Upgrade selected' : ' · Choose an upgrade'}` :
+                gameState.upgradeChosen ? 'Ready when you are.' : 'Choose an upgrade to continue.';
+        }
+        function chooseUpgrade(kind) {
+            if (gameState.phase !== 'intermission' || gameState.upgradeChosen) return;
+            if (kind === 'beam' && gameState.beamWidth < Math.PI/2-.001) gameState.beamWidth = Math.min(Math.PI/2,gameState.beamWidth+Math.PI/36);
+            else if (kind === 'rotation' && gameState.rotationSpeed < 5.4-.001) gameState.rotationSpeed = Math.min(5.4,gameState.rotationSpeed+.4);
+            else if (kind === 'ammo' && gameState.bulletLimit < 6) gameState.bulletLimit++;
+            else return;
+            gameState.upgradeChosen = true;
+            for (const id of ['beamUpgradeBtn','rotationUpgradeBtn','ammoUpgradeBtn']) document.getElementById(id).disabled = true;
+            document.getElementById('breakSummary').textContent += ` ${kind === 'beam' ? 'Wider searchlight' : kind === 'rotation' ? 'Faster turret' : 'Extra ammunition'} equipped.`;
+            updateBreak(); updateHud(); playSound('upgrade');
+            document.getElementById('nextWaveBtn').disabled ? document.getElementById('upgradePanel').focus() : document.getElementById('nextWaveBtn').focus();
+        }
+        function nextWave() {
+            if (gameState.phase !== 'intermission' || !gameState.upgradeChosen || Date.now()-gameState.breakStartTime < 4000) return;
+            const now = Date.now();
+            gameState.gameStartTime += now-gameState.breakStartTime; // Score measures combat time only.
+            gameState.level++;
+            gameState.waveSize = Math.min(25,5+(gameState.level-1)*2);
+            gameState.waveSpawned = 0;
+            gameState.monsterSpawnInterval = Math.max(.8,2.6-(gameState.level-1)*.15);
+            gameState.lastSpawnTime = gameState.lastUpdateTime = now;
+            gameState.firstSpawn = true;
+            gameState.phase = 'combat';
+            clearKeys(); unlockAudio();
+            document.getElementById('upgradePanel').style.display = 'none';
+            updateHud(); document.getElementById('fireBtn').focus();
+        }
+        document.getElementById('beamUpgradeBtn').addEventListener('click', () => chooseUpgrade('beam'));
+        document.getElementById('rotationUpgradeBtn').addEventListener('click', () => chooseUpgrade('rotation'));
+        document.getElementById('ammoUpgradeBtn').addEventListener('click', () => chooseUpgrade('ammo'));
+        document.getElementById('nextWaveBtn').addEventListener('click', nextWave);
+
         // Cache terrain once; effects are drawn separately and do not allocate per frame.
         const terrain = document.createElement('canvas');
         terrain.width = terrain.height = 800;
@@ -677,15 +838,17 @@
         }
         function updateHud() {
             document.getElementById('health').textContent = `${gameState.health} / 3`;
-            document.getElementById('ammo').textContent = `${3-gameState.bullets.length} / 3`;
+            document.getElementById('ammo').textContent = `${gameState.bulletLimit-gameState.bullets.length} / ${gameState.bulletLimit}`;
             document.getElementById('level').textContent = gameState.level;
             document.getElementById('kills').textContent = gameState.kills;
             document.getElementById('attacking').textContent = gameState.monsters.length;
-            document.getElementById('timer').textContent = Math.ceil(gameState.levelTimer);
+            document.getElementById('remaining').textContent =
+                gameState.waveSize - gameState.waveSpawned + gameState.monsters.length;
+            document.getElementById('waveStatus').textContent = gameState.phase === 'intermission' ? 'Resupply' : 'Hold the line';
         }
 
         function updateGame() {
-            if (!gameState.gameStarted || gameState.gameOver) return;
+            if (!gameState.gameStarted || gameState.gameOver || document.hidden) return;
             
             const now = Date.now();
             // Time since last update in seconds, clamped: requestAnimationFrame stops while
@@ -708,30 +871,21 @@
                 return; // Don't update anything else during blinking
             }
             
-            // Update level timer only if game is not over
-            if (!gameState.gameOver) {
-                const levelElapsed = (now - gameState.lastLevelTime) / 1000;
-                gameState.levelTimer = Math.max(0, 60 - levelElapsed);
-                
-                if (gameState.levelTimer === 0) {
-                    gameState.level++;
-                    gameState.lastLevelTime = now;
-                    gameState.levelTimer = 60;
-                    
-                    // Update spawn rate every level
-                    gameState.monsterSpawnInterval = Math.max(1, gameState.monsterSpawnInterval - 0.5);
-                }
+            if (gameState.phase === 'intermission') {
+                updateBreak();
+                return;
             }
-            
-            // Spawn monsters (only if game not over)
-            if (!gameState.gameOver && (now - gameState.lastSpawnTime) / 1000 > (gameState.firstSpawn ? 2.5 : gameState.monsterSpawnInterval)) {
+            // Finite waves finish only when every spawned enemy has been resolved.
+            if (gameState.waveSpawned < gameState.waveSize &&
+                (now-gameState.lastSpawnTime)/1000 > (gameState.firstSpawn ? 2.5 : gameState.monsterSpawnInterval)) {
                 gameState.monsters.push(new Monster());
+                gameState.waveSpawned++;
                 gameState.firstSpawn = false;
                 gameState.lastSpawnTime = now;
             }
-            
+
             // Rotate beam - now time-based instead of frame-based
-            const rotationSpeed = 3.0; // radians per second (adjustable)
+            const rotationSpeed = gameState.rotationSpeed; // radians per second (adjustable)
             if (keys.ArrowLeft) {
                 gameState.beamAngle -= rotationSpeed * deltaTime;
             }
@@ -740,7 +894,7 @@
             }
             
             // Shoot bullets (only if game not over and bullet limit not reached)
-            if (!gameState.gameOver && keys.Space && !keys.spacePressed && gameState.bullets.length <= 2) {
+            if (!gameState.gameOver && keys.Space && !keys.spacePressed && gameState.bullets.length < gameState.bulletLimit) {
                 gameState.bullets.push(new Bullet(gameState.beamAngle));
                 keys.spacePressed = true;
             }
@@ -768,6 +922,7 @@
                         
                         // Damage the monster
                         monster.hp--;
+                        playSound(monster.hp > 0 ? 'armor' : 'hit');
                         spawnParticles(monster.x,monster.y,monster.hp > 0 ? '#eed6a5' : '#c9836f',monster.hp > 0 ? 7 : 15);
                         
                         if (monster.hp <= 0) {
@@ -789,8 +944,17 @@
             gameState.bouncingBullets = gameState.bouncingBullets.filter(bullet => bullet.update(deltaTime));
             
             updateHud();
+            const nearest = gameState.monsters.reduce((best,m) => {
+                const d = Math.hypot(m.x-centerX,m.y-centerY);
+                return !best || d < best.d ? {m,d} : best;
+            }, null);
+            if (nearest && nearest.d < 220 && now-gameState.lastFootstepTime > Math.max(220,nearest.d*3)) {
+                playSound('step',Math.max(-1,Math.min(1,(nearest.m.x-centerX)/gameRadius)));
+                gameState.lastFootstepTime = now;
+            }
+            if (gameState.waveSpawned === gameState.waveSize && gameState.monsters.length === 0) finishWave();
         }
-        
+
         function draw() {
             // Clear canvas
             ctx.drawImage(terrain,0,0);
@@ -845,7 +1009,7 @@
             document.getElementById('level').textContent = '1';
             document.getElementById('kills').textContent = '0';
             document.getElementById('attacking').textContent = '0';
-            document.getElementById('timer').textContent = '60';
+            document.getElementById('upgradePanel').style.display = 'none';
             updateHud();
 
             // Hide all game over screens and show start screen
@@ -867,6 +1031,7 @@
                     const score = {
                         name: playerName,
                         level: gameState.level,
+                        mode: 'waves',
                         kills: gameState.kills,
                         time: gameState.survivalTime,
                         date: new Date().toLocaleDateString()
@@ -919,14 +1084,14 @@
                     <div class="score-entry">
                         <span class="score-rank">#${index + 1}</span>
                         <span class="score-name">${escapeHtml(score.name)}</span><br>
-                        <span class="score-details">Level ${score.level} • ${score.kills} kills • ${score.time}s</span>
+                        <span class="score-details">${score.mode === 'waves' ? 'Wave' : 'Legacy level'} ${score.level} • ${score.kills} kills • ${score.time}s</span>
                     </div>
                 `).join('');
             }
         }
         
         function compareScores(a, b) {
-            return b.level - a.level || b.kills - a.kills || a.time - b.time;
+            return Number(b.mode === 'waves') - Number(a.mode === 'waves') || b.level - a.level || b.kills - a.kills || a.time - b.time;
         }
         function escapeHtml(value) {
             return value.replace(/[&<>"']/g, char => ({
@@ -939,6 +1104,7 @@
         function startGame() {
             if (gameState.gameStarted) return;
             clearKeys();
+            unlockAudio();
             const now = Date.now();
             gameState.gameStarted = true;
             gameState.lastSpawnTime = gameState.lastLevelTime = now;
@@ -951,11 +1117,26 @@
             clearKeys();
             document.getElementById('gameOver').style.display = 'none';
             document.getElementById('scoreDisplay').textContent =
-                `Level ${gameState.level} • ${gameState.kills} kills • ${gameState.survivalTime}s survived`;
+                `Wave ${gameState.level} • ${gameState.kills} kills • ${gameState.survivalTime}s survived`;
             document.getElementById('nameEntry').style.display = 'block';
             document.getElementById('playerName').focus();
         }
         window.addEventListener('keydown', e => {
+            if (gameState.gameStarted && gameState.phase === 'intermission') {
+                if (e.code === 'Digit1') chooseUpgrade('beam');
+                else if (e.code === 'Digit2') chooseUpgrade('rotation');
+                else if (e.code === 'Digit3') chooseUpgrade('ammo');
+                else if (e.code === 'Enter' && !(e.target instanceof HTMLButtonElement)) nextWave();
+                else if (e.code === 'Tab') {
+                    const choices = ['beamUpgradeBtn','rotationUpgradeBtn','ammoUpgradeBtn','nextWaveBtn']
+                        .map(id => document.getElementById(id)).filter(button => !button.disabled);
+                    const current = choices.indexOf(e.target);
+                    if (choices.length) choices[(current + (e.shiftKey ? -1 : 1) + choices.length) % choices.length].focus();
+                    else document.getElementById('upgradePanel').focus();
+                    e.preventDefault();
+                }
+                return;
+            }
             if (e.target instanceof HTMLInputElement) {
                 if (e.code === 'Enter' && !e.repeat) { e.preventDefault(); saveScore(); }
                 return;
@@ -975,7 +1156,24 @@
             }
         });
         window.addEventListener('blur', clearKeys);
-        document.addEventListener('visibilitychange', clearKeys);
+        document.addEventListener('visibilitychange', () => {
+            clearKeys();
+            if (!gameState.gameStarted || gameState.gameOver) return;
+            const now = Date.now();
+            if (document.hidden) {
+                gameState.pauseStarted = now;
+                if (audioContext) audioContext.suspend().catch(() => {});
+            } else if (gameState.pauseStarted !== null) {
+                const paused = now-gameState.pauseStarted;
+                gameState.gameStartTime += paused;
+                gameState.lastSpawnTime += paused;
+                gameState.breakStartTime += paused;
+                gameState.blinkStartTime += paused;
+                gameState.lastUpdateTime = now;
+                gameState.pauseStarted = null;
+                if (audioContext && !muted) audioContext.resume().catch(() => {});
+            }
+        });
         document.getElementById('startBtn').addEventListener('click', startGame);
         document.getElementById('recordScoreBtn').addEventListener('click', showNameEntry);
         document.getElementById('restartBtn').addEventListener('click', () => {
@@ -996,7 +1194,7 @@
         bindTouch('rotateLeftBtn', 'ArrowLeft');
         bindTouch('rotateRightBtn', 'ArrowRight');
         document.getElementById('fireBtn').addEventListener('click', () => {
-            if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && gameState.bullets.length < 3) {
+            if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && gameState.phase === 'combat' && !document.hidden && gameState.bullets.length < gameState.bulletLimit) {
                 gameState.bullets.push(new Bullet(gameState.beamAngle));
                 updateHud();
             }
@@ -1030,5 +1228,6 @@
     </script>
 </body>
 </html>
+
 
 
