@@ -13,7 +13,7 @@ open index.html                 # opens directly via file:// — works, no serve
 python3 -m http.server 8000     # optional: serve at http://localhost:8000
 ```
 
-Run `node check.cjs` for game logic regression checks. Browser rendering and real touch interactions still need manual verification. The responsive grid scales the 800×800 canvas to the viewport, places statistics above it and wave progress/timing plus controls below it. The leaderboard is inside the start screen and is not shown during play. Pointer buttons support held rotation; Fire, Start, record score and restart use clickable buttons.
+Run `node check.cjs` for game logic regression checks. Browser rendering and real touch interactions still need manual verification. The responsive grid scales the 800×800 canvas to the viewport, places a compact two-line status bar above it and wave progress/timing plus controls below it. A 44px Settings button replaces the large audio controls in the gameplay header. The leaderboard is inside the start screen and is not shown during play. Pointer buttons support held rotation; Fire, Start, record score and restart use clickable buttons.
 
 ## Architecture
 
@@ -36,6 +36,8 @@ All script code lives inside a single `DOMContentLoaded` callback. Nothing is at
 **Intermission and upgrades.** `phase` is combat or intermission. `finishWave()` clears projectiles and held keys, repairs one health (max 3), displays the upgrade dialog and starts a four-second resupply break. No enemies move/spawn and no firing occurs during intermission. `chooseUpgrade()` permits one choice per break: beam +5° (max 90°), rotation +0.4 radians/s (max 5.4), ammo +1 (max 6). `nextWave()` needs both elapsed resupply time and a choice, except when all upgrades are maxed. The player explicitly starts the next wave. Keyboard 1/2/3 select upgrades, and Tab stays inside the dialog. Upgrade values reset on a new run.
 
 **Fire limit.** `bulletLimit` starts at 3. Both keyboard and button shooting compare the in-flight count to that field. `keys.spacePressed` is the keyboard edge-detect latch; holding SPACE fires once.
+
+**Settings.** The native settingsDialog contains sound toggle, Test sound and audio status. It opens from the gameplay gear or start-screen Settings button. settingsOpen pauses simulation and firing. Closing via Done or the native dialog close event shifts combat/spawn/wave/break/defeat timestamps to exclude the pause, clears held keys and restores focus to Fire. Hidden-page pause also shifts settingsOpenedAt, avoiding double counting when backgrounded with Settings open.
 
 **Audio.** Synthesized Web Audio needs no assets. On supported browsers, unlockAudio() sets navigator.audioSession.type to playback so iOS does not use the default ambient session that can follow Silent Mode. Gameplay taps retry context resume; closed contexts are recreated with a new voice generation. State changes update an audio status message. Test sound unmutes, resumes and waits for running state before scheduling the chime; a running context does not establish that output is audible on the actual device. The context is created/resumed after a user gesture; unavailable audio does not prevent play. A master gain controls mute, which is persisted under castle-defense-muted. There are at most 12 active oscillators, each stopped and disconnected after its short sound. Footsteps pan horizontally toward the nearest approaching monster. Shot, impact, armor, breach, clear and upgrade sounds are bounded in duration.
 
