@@ -282,22 +282,49 @@
             .wave-number { font-size: 17px; }
         }
         @media (pointer: coarse) { #instructions { display: none; } }
+        #statusBar { grid-column: 1 / -1; grid-row: 1; display: grid;
+            grid-template-columns: minmax(0,1fr) 44px; gap: 5px 12px;
+            padding: 10px 12px; border-bottom: 1px solid #304455; }
+        .status-primary, .status-secondary { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; }
+        .status-primary { font-size: 14px; color: #c1d1dd; }
+        .status-primary strong, .status-primary span span { color: #f4dca3; font-variant-numeric: tabular-nums; }
+        .status-secondary { font-size: 12px; color: #92aabc; }
+        #settingsBtn { grid-column: 2; grid-row: 1 / 3; padding: 0; width: 44px; min-height: 44px;
+            align-self: center; background: transparent; border: 1px solid #3a5367; box-shadow: none; font-size: 24px; }
+        #settingsDialog { width: min(380px,calc(100% - 32px)); box-sizing: border-box;
+            background: #112436; color: #e3edf5; border: 1px solid #496277; border-radius: 16px; padding: 24px; }
+        #settingsDialog::backdrop { background: #030b14d9; }
+        #settingsDialog h2 { font-family: Georgia,serif; color: #ecd5a4; margin: 0 0 18px; }
+        .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+        #settingsDialog #soundBtn, #settingsDialog #testSoundBtn { font-size: 16px; min-height: 44px; padding: 8px 14px; margin: 0; }
+        #settingsDialog #soundStatus { font-size: 14px !important; color: #a9bdcf; margin: 14px 0 !important; }
+        #closeSettingsBtn { width: 100%; margin-top: 8px; }
+        #startSettingsBtn { background: transparent; box-shadow: none; font-size: 14px; margin-top: 12px; min-height: 44px; }
     </style>
 </head>
 <body>
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="800"></canvas>
-        <div id="ui-left">
-            <div>Wave <span id="level">1</span> · Castle <span id="health" aria-label="Castle health">3 / 3</span></div>
-        </div>
-        <div id="ui-right">
-            <div>Monsters Attacking: <span id="attacking">0</span></div>
-            <div>Monsters Killed: <span id="kills">0</span></div>
-            <div>Ammo ready: <span id="ammo">3 / 3</span></div>
-            <button id="soundBtn" aria-pressed="false">Sound on</button>
+        <header id="statusBar" aria-label="Game status">
+            <div class="status-primary">
+                <strong>Wave <span id="level">1</span></strong>
+                <span>Castle <span id="health" aria-label="Castle health">3 / 3</span></span>
+                <span>Ammo <span id="ammo">3 / 3</span></span>
+            </div>
+            <div class="status-secondary">
+                <span>Threats <span id="attacking">0</span></span>
+                <span>Kills <span id="kills">0</span></span>
+            </div>
+            <button id="settingsBtn" aria-label="Settings" title="Settings">⚙</button>
+        </header>
+        <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+            <h2 id="settingsTitle">Settings</h2>
+            <p style="font-size:14px;color:#a9bdcf;line-height:1.5">The game pauses while you adjust settings.</p>
+            <div class="settings-row"><span>Game sound</span><button id="soundBtn" aria-pressed="false">Sound on</button></div>
             <button id="testSoundBtn">Test sound</button>
-            <div id="soundStatus" role="status" aria-live="polite" style="font-size:12px;line-height:1.4;margin-top:6px"></div>
-        </div>
+            <div id="soundStatus" role="status" aria-live="polite" style="line-height:1.5"></div>
+            <button id="closeSettingsBtn">Done</button>
+        </dialog>
         <div id="gameOver">
             GAME OVER!<br>
             <span style="font-size: 24px">Record your result? (Y/N)</span><br>
@@ -355,6 +382,7 @@
         <h1>Castle Defense: Night Siege</h1>
         <p>Keep the light moving. Find what lurks in the dark.<br>Protect the castle through the night.</p>
         <button id="startBtn">Start game</button>
+        <button id="startSettingsBtn">Settings</button>
         <div class="controls">
             Use LEFT/RIGHT arrows to rotate<br>
             SPACE to shoot<br>
@@ -401,6 +429,8 @@
                 rotationSpeed: 3,
                 bulletLimit: 3,
                 pauseStarted: null,
+                settingsOpen: false,
+                settingsOpenedAt: 0,
                 lastFootstepTime: 0,
                 firstSpawn: true,
                 health: 3,
@@ -920,7 +950,7 @@
             document.getElementById('waveResolved').textContent = `${cleared} / ${gameState.waveSize}`;
             const progress = document.getElementById('waveProgress');
             progress.max = gameState.waveSize; progress.value = cleared;
-            if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && gameState.phase === 'combat') {
+            if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && !gameState.settingsOpen && gameState.phase === 'combat') {
                 gameState.waveElapsed = Math.max(0,(Date.now()-gameState.waveStartTime)/1000);
             }
             document.getElementById('waveTime').textContent = formatTime(gameState.waveElapsed);
@@ -935,7 +965,7 @@
         }
 
         function updateGame() {
-            if (!gameState.gameStarted || gameState.gameOver || document.hidden) return;
+            if (!gameState.gameStarted || gameState.gameOver || document.hidden || gameState.settingsOpen) return;
             
             const now = Date.now();
             // Time since last update in seconds, clamped: requestAnimationFrame stops while
@@ -1091,6 +1121,7 @@
         // Game reset and score functions
         function resetToStartScreen() {
             // High scores are the only thing that survives a reset
+            document.getElementById('settingsDialog').close();
             gameState = createState(gameState.highScores || []);
             clearKeys();
             document.getElementById('level').textContent = '1';
@@ -1188,6 +1219,38 @@
         function clearKeys() {
             keys.ArrowLeft = keys.ArrowRight = keys.Space = keys.spacePressed = false;
         }
+        function openSettings() {
+            if (gameState.settingsOpen) return;
+            clearKeys();
+            gameState.settingsOpen = true;
+            gameState.settingsOpenedAt = Date.now();
+            document.getElementById('settingsDialog').showModal();
+            document.getElementById('closeSettingsBtn').focus();
+        }
+        function restoreAfterSettings() {
+            if (!gameState.settingsOpen) return;
+            const now = Date.now();
+            if (gameState.gameStarted && !gameState.gameOver) {
+                const paused = now-gameState.settingsOpenedAt;
+                gameState.gameStartTime += paused;
+                gameState.lastSpawnTime += paused;
+                gameState.waveStartTime += paused;
+                gameState.breakStartTime += paused;
+                gameState.blinkStartTime += paused;
+                gameState.lastUpdateTime = now;
+            }
+            gameState.settingsOpen = false;
+            clearKeys(); updateHud();
+            document.getElementById(gameState.gameStarted ? 'fireBtn' : 'startSettingsBtn').focus();
+        }
+        document.getElementById('settingsBtn').addEventListener('click', openSettings);
+        document.getElementById('startSettingsBtn').addEventListener('click', openSettings);
+        document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+            document.getElementById('settingsDialog').close();
+            restoreAfterSettings();
+        });
+        document.getElementById('settingsDialog').addEventListener('close', restoreAfterSettings);
+
         function startGame() {
             if (gameState.gameStarted) return;
             clearKeys();
@@ -1209,6 +1272,7 @@
             document.getElementById('playerName').focus();
         }
         window.addEventListener('keydown', e => {
+            if (gameState.settingsOpen) return;
             if (gameState.gameStarted && gameState.phase === 'intermission') {
                 if (e.code === 'Digit1') chooseUpgrade('beam');
                 else if (e.code === 'Digit2') chooseUpgrade('rotation');
@@ -1257,6 +1321,7 @@
                 const paused = now-gameState.pauseStarted;
                 gameState.gameStartTime += paused;
                 gameState.lastSpawnTime += paused;
+                if (gameState.settingsOpen) gameState.settingsOpenedAt += paused;
                 gameState.waveStartTime += paused;
                 gameState.breakStartTime += paused;
                 gameState.blinkStartTime += paused;
@@ -1287,7 +1352,7 @@
         bindTouch('rotateRightBtn', 'ArrowRight');
         document.getElementById('fireBtn').addEventListener('click', () => {
             unlockAudio();
-            if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && gameState.phase === 'combat' && !document.hidden && gameState.bullets.length < gameState.bulletLimit) {
+            if (gameState.gameStarted && !gameState.gameOver && !gameState.blinkingPhase && !gameState.settingsOpen && gameState.phase === 'combat' && !document.hidden && gameState.bullets.length < gameState.bulletLimit) {
                 gameState.bullets.push(new Bullet(gameState.beamAngle));
                 updateHud();
             }
@@ -1322,6 +1387,7 @@
     </script>
 </body>
 </html>
+
 
 
 
