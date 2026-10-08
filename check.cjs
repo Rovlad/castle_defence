@@ -12,7 +12,7 @@ function boot(blockStorage = false, withAudio = false) {
     class Element {
         constructor() { this.style = {}; this.value = ''; this.textContent = ''; this.innerHTML = ''; this.listeners = {}; }
         addEventListener(type, fn) { this.listeners[type] = fn; }
-        focus() {}
+        focus() { sandbox.document.activeElement = this; }
         setPointerCapture() {}
         setAttribute() {}
     }
@@ -45,7 +45,14 @@ function boot(blockStorage = false, withAudio = false) {
     const instrumented = script.replace('        // Start game loop', '        window.test = {get state(){return gameState;}, keys, startGame, updateGame, saveScore, resetToStartScreen, showNameEntry, Monster, finishWave, chooseUpgrade, nextWave, updateBreak, playSound};\n        // Start game loop');
     vm.runInContext(instrumented, sandbox);
     events.DOMContentLoaded();
-    return {t:sandbox.window.test, elements, events, sandbox, audio, advance(ms){now+=ms;}, key(code,target){let prevented=false;events.keydown({code,target,repeat:false,preventDefault(){prevented=true;}});return prevented;}};
+    return {t:sandbox.window.test, elements, events, sandbox, audio, advance(ms){now+=ms;}, key(code,target){let prevented=false;events.keydown({code,target,repeat:false,preventDefault(){prevented=true;}});return prevented;},
+        pressSpace(target=sandbox.document.activeElement) {
+            let downPrevented=false,upPrevented=false;
+            events.keydown({code:'Space',target,repeat:false,preventDefault(){downPrevented=true;}});
+            events.keyup({code:'Space',target,preventDefault(){upPrevented=true;}});
+            // Native button activation occurs on Space release unless its default is cancelled.
+            if (target instanceof Button && !target.disabled && !downPrevented && !upPrevented) target.listeners.click?.();
+        }};
 }
 const g = boot();
 g.elements.startBtn.listeners.click();
@@ -124,10 +131,18 @@ const beamBefore=waves.t.state.beamWidth;waves.t.chooseUpgrade('beam');assert.eq
 waves.t.nextWave();assert.equal(waves.t.state.phase,'intermission');
 waves.advance(4200);waves.t.updateGame();assert.equal(waves.elements.nextWaveBtn.disabled,false);
 waves.advance(10000);waves.t.nextWave();
+assert.equal(waves.sandbox.document.activeElement,waves.elements.fireBtn);
+waves.pressSpace();
+assert.equal(waves.t.state.bullets.length,1,'Space must fire after nextWave focuses the Fire button');
+waves.pressSpace();assert.equal(waves.t.state.bullets.length,2,'Each key press should fire exactly once');
+waves.elements.fireBtn.listeners.click();assert.equal(waves.t.state.bullets.length,3,'Touch/click firing still works after a wave transition');
+waves.t.state.bullets=[];
 assert.equal(waves.t.state.level,2);assert.equal(waves.t.state.waveSize,7);
 assert.equal(waves.t.state.waveSpawned,0);assert.equal(waves.t.state.phase,'combat');
 assert.equal(waves.sandbox.Date.now()-waves.t.state.gameStartTime,combatTime);
 for(let i=0;i<5;i++)waves.elements.fireBtn.listeners.click();assert.equal(waves.t.state.bullets.length,4);
+waves.t.state.bullets=[];
+for(let i=0;i<5;i++)waves.pressSpace();assert.equal(waves.t.state.bullets.length,4,'Keyboard firing honors the upgraded ammunition limit');
 // Visibility pause excludes background time and prevents a spawn jump.
 const spawnBefore=waves.t.state.lastSpawnTime;
 waves.sandbox.document.hidden=true;waves.events.visibilitychange();
@@ -168,5 +183,6 @@ assert.equal(boot(true).t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','broken json');assert.equal(boot().t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','[{"name":"bad"}]');assert.equal(boot().t.state.highScores.length,0);
 console.log('PASS: existing controls/combat/scoring plus finite waves, survivor gating, repairs, break/choice gating, one capped upgrade, expanded ammo, reset, pause accounting, bounded/panned audio, mute persistence and hidden-page audio suspension.');
+
 
 
