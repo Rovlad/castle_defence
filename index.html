@@ -1152,7 +1152,9 @@
         window.addEventListener('keyup', e => {
             if (Object.hasOwn(keys, e.code)) {
                 keys[e.code] = false;
-                if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+                // Space activates a focused button on keyup; cancelling that default
+                // disables keyboard firing after nextWave() focuses the Fire button.
+                if (!(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLButtonElement)) e.preventDefault();
             }
         });
         window.addEventListener('blur', clearKeys);
@@ -1228,6 +1230,7 @@
     </script>
 </body>
 </html>
+
 
 
 
