@@ -192,6 +192,7 @@ export class Arena {
     update(game:Siege,dt:number) {
         this.camera.position.set(STATION.x,STATION.y,STATION.z);
         this.camera.rotation.set(game.pitch,game.yaw,0);
+        this.spotlight.intensity=game.searchlightIntensity;
         const d=aimDirection(game.yaw,game.pitch);this.spotlight.direction.set(d.x,d.y,d.z);this.spotlight.angle=game.beam;
         const ids=new Set(game.enemies.map(e=>e.id));
         for(const [id,body] of this.bodies)if(!ids.has(id)){body.meshes.forEach(mesh=>this.shadow.removeShadowCaster(mesh));body.root.dispose();body.paint.dispose();this.bodies.delete(id);}

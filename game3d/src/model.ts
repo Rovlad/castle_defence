@@ -6,11 +6,11 @@ export const DIFFICULTIES = {
     suicide: { label: 'Suicide', speed: 1.6, interval: .65, enemies: 1.5 }
 } as const;
 export type Difficulty = keyof typeof DIFFICULTIES;
-export const UPGRADE_COSTS = { beam: 30, turn: 40, ammo: 50, damage: 100, velocity: 60, blast: 150, jammer: 120 } as const;
+export const UPGRADE_COSTS = { beam: 30, brightness: 40, turn: 40, ammo: 50, damage: 100, velocity: 60, blast: 150, jammer: 120 } as const;
 export const KILL_POINTS = { scout: 10, armored: 20, heavy: 30 } as const;
 export const WAVE_BONUS = 20;
 export type Phase = 'ready' | 'combat' | 'resupply' | 'lost';
-export const UPGRADES = ['beam','turn','ammo','damage','velocity','blast','jammer'] as const;
+export const UPGRADES = ['beam','brightness','turn','ammo','damage','velocity','blast','jammer'] as const;
 export type Upgrade = typeof UPGRADES[number];
 export type Enemy = { id: number; x: number; y: number; z: number; hp: number; maxHp: number; radius: number; speed: number; kind: 'scout' | 'armored' | 'heavy'; reveal: number; age: number; hitFlash?: number };
 export type Bullet = { id: number; pos: V3; direction: V3; age: number; speed: number; damage: number; blast: number };
@@ -50,6 +50,7 @@ export class Siege {
     phase: Phase = 'ready';
     wave = 1; health = 3; kills = 0; waveSize = 5; spawned = 0;
     yaw = 0; pitch = Math.atan2(STATION.y-3,SPAWN_RADIUS); beam = Math.PI/5; turnSpeed = 1.4; capacity = 3;
+    brightnessLevel = 0;
     damage = 1; projectileSpeed = 62; blastRadius = 0; jammerOwned = false; jamRemaining = 0; jamCooldown = 0;
     elapsed = 0; waveElapsed = 0; spawnElapsed = 0; resupplyElapsed = 0; cooldown = 0;
     points = 0; earnedPoints = 0; paused = false;
@@ -67,6 +68,7 @@ export class Siege {
         this.paused = paused; return true;
     }
     private award(points: number) { this.points += points; this.earnedPoints += points; }
+    get searchlightIntensity() { return 4.6 * (1 + this.brightnessLevel * .5); }
     get remaining() { return this.waveSize-this.spawned+this.enemies.length; }
     get resolved() { return this.spawned-this.enemies.length; }
     get spawnDelay() { return (this.spawned === 0 ? 2.5 : Math.max(.9,2.8-(this.wave-1)*.12))*this.rules.interval; }
@@ -113,13 +115,14 @@ export class Siege {
         this.events.push({kind:'shot',pos}); return true;
     }
     canUpgrade(kind: Upgrade) {
-        return kind === 'beam' ? this.beam < Math.PI/2-.001 : kind === 'turn' ? this.turnSpeed < 2.9-.001 :
+        return kind === 'brightness' ? this.brightnessLevel < 3 : kind === 'beam' ? this.beam < Math.PI/2-.001 : kind === 'turn' ? this.turnSpeed < 2.9-.001 :
             kind === 'ammo' ? this.capacity < 6 : kind === 'damage' ? this.damage < 3 :
             kind === 'velocity' ? this.projectileSpeed < 100 : kind === 'blast' ? this.blastRadius === 0 :
             kind === 'jammer' ? !this.jammerOwned : false;
     }
     upgrade(kind: Upgrade) {
         if (this.paused || this.phase !== 'resupply' || !this.canUpgrade(kind) || this.points < UPGRADE_COSTS[kind]) return false;
+        if (kind === 'brightness') this.brightnessLevel++;
         if (kind === 'beam') this.beam = Math.min(Math.PI/2,this.beam+Math.PI/36);
         if (kind === 'turn') this.turnSpeed = Math.min(2.9,this.turnSpeed+.25);
         if (kind === 'ammo') this.capacity++;
