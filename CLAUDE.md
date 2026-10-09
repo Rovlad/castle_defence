@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 "Castle Defense: Night Siege" — a browser canvas game contained entirely in `index.html`. HTML, CSS, and JS are in that one file; there is no build step, no package manager, no dependencies, a dependency-free Node regression check (`node check.cjs`), and no linter. `README.md` contains play and verification instructions.
 
+## Separate 3D game
+
+`game3d/` contains a separate Babylon.js / TypeScript / Vite game. The player stays at a fixed station and can rotate yaw/pitch and shoot, with no walking controls. Run `npm ci`, `npm test`, and `npm run build` from that directory. The build type-checks and replaces the adjacent committed `3d/` directory for GitHub Pages; commit rebuilt assets with source edits. Refer to `game3d/README.md` for architecture and controls. Existing guidance below applies to the original 2D game.
+
 ## Running
 
 ```bash
