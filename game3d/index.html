@@ -10,6 +10,11 @@
     <div class="resources"><span>Castle <b id="health">3 / 3</b></span><span>Ammo <b id="ammo">3 / 3</b></span></div>
     <button id="settingsBtn" class="icon" aria-label="Settings">⚙</button></div>
   <div id="crosshair" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <aside id="radarPanel" aria-label="Castle radar">
+    <div class="radarHeading"><span>RADAR</span><small id="radarTargets">0 targets</small></div>
+    <canvas id="radarCanvas" role="img" aria-label="Radar: castle at the centre, north at the top."></canvas>
+    <div class="radarLegend"><span>● Targets</span><span>▰ Beam</span></div>
+  </aside>
   <div id="hitFlash" aria-hidden="true"></div><div id="damageFlash" aria-hidden="true"></div>
   <div id="toast" role="status"></div>
   <div class="bottomline"><div><span class="eyebrow">WAVE PROGRESS</span><strong id="progressText">0 / 5</strong><progress id="progress" max="5" value="0"></progress></div>

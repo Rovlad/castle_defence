@@ -1,4 +1,5 @@
 import { Siege, STATION, segmentHit, aimDirection, type Enemy } from './src/model.ts';
+import { radarPoint, radarSector } from './src/radar.ts';
 function assert(condition:unknown,message:string) {if(!condition)throw Error(message);}
 const advance=(g:Siege,seconds:number)=>{for(let i=0;i<Math.ceil(seconds/.025);i++)g.tick(.025);};
 assert(segmentHit({x:0,y:0,z:0},{x:10,y:0,z:0},{x:5,y:0,z:0},1)===.4,'Swept bullet hits between frames');
@@ -33,4 +34,10 @@ const tiers=new Siege(()=>.25);tiers.wave=5;tiers.waveSize=3;tiers.start();
 for(let i=0;i<3;i++){advance(tiers,3);tiers.enemies.forEach(e=>e.speed=0);}
 assert(tiers.enemies.some(e=>e.kind==='armored')&&tiers.enemies.some(e=>e.kind==='heavy'),'Later waves include both armor tiers');
 const direction=aimDirection(Math.PI/2,0);assert(Math.abs(direction.x-1)<1e-8,'Yaw points east');
+const north=radarPoint(0,46),east=radarPoint(46,0),south=radarPoint(0,-46),west=radarPoint(-46,0);
+assert(north.x===80&&north.y<80&&east.x>80&&east.y===80&&south.y>80&&west.x<80,'Radar cardinal directions match world coordinates');
+assert(radarPoint(0,0).x===80&&radarPoint(0,0).y===80,'Castle stays at radar centre');
+assert(Math.abs(radarPoint(0,20).y-80)<Math.abs(north.y-80),'Approaching targets move inward');
+const sector=radarSector(Math.PI/2,Math.PI/5);
+assert(Math.abs(sector.start+sector.end)<1e-8&&Math.abs(sector.end-sector.start-Math.PI/5)<1e-8,'Radar beam points east and matches searchlight width');
 console.log('PASS: fixed station, aim bounds, swept hits, bullets, armor, castle health, waves, one upgrade, timers, maxima and enemy tiers.');
