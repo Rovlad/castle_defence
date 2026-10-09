@@ -2,6 +2,7 @@ import { Siege, STATION, SPAWN_RADIUS, DIFFICULTIES, UPGRADE_COSTS, KILL_POINTS,
 import { radarPoint, radarSector } from './src/radar.ts';
 import { AimSmoother } from './src/controls.ts';
 import { targetFeedback } from './src/feedback.ts';
+import { loadDifficultyPreferences } from './src/preferences.ts';
 function assert(condition:unknown,message:string) {if(!condition)throw Error(message);}
 const advance=(g:Siege,seconds:number)=>{for(let i=0;i<Math.ceil(seconds/.025);i++)g.tick(.025);};
 assert(segmentHit({x:0,y:0,z:0},{x:10,y:0,z:0},{x:5,y:0,z:0},1)===.4,'Swept bullet hits between frames');
@@ -154,3 +155,20 @@ for(const difficulty of Object.keys(DIFFICULTIES) as (keyof typeof DIFFICULTIES)
 }
 const fresh=new Siege(Math.random,'hard');assert(fresh.points===0&&fresh.earnedPoints===0&&!fresh.paused&&fresh.difficulty==='hard','New run resets economy, pause and upgrades while using selected difficulty');
 console.log('PASS: extended arena, purchases, savings, kill and wave rewards, splash rewards, pause/resume and four difficulties.');
+const preferences=new Map<string,string>([['night-siege-3d-best-hard','{broken'],['night-siege-3d-difficulty','normal']]);
+const storage={getItem:(key:string)=>preferences.get(key)??null,setItem:(key:string,value:string)=>{preferences.set(key,value);}};
+assert(loadDifficultyPreferences(storage,'hard')===null,'Malformed score is ignored');
+assert(preferences.get('night-siege-3d-difficulty')==='hard','Malformed score does not prevent remembering Hard');
+const remembered=preferences.get('night-siege-3d-difficulty') as 'hard';
+loadDifficultyPreferences(storage,remembered);
+assert(preferences.get('night-siege-3d-difficulty')==='hard','Remembered selection survives loading preferences again');
+const validScore={wave:3,kills:12,time:40};preferences.set('night-siege-3d-best-normal',JSON.stringify(validScore));
+assert(loadDifficultyPreferences(storage,'normal')?.kills===12,'Valid scores still load');
+assert(loadDifficultyPreferences({...storage,setItem(){throw Error('Write denied');}},'normal')?.wave===3,'Failed difficulty write does not discard a valid score');
+loadDifficultyPreferences({...storage,getItem(){throw Error('Read denied');}},'easy');
+assert(preferences.get('night-siege-3d-difficulty')==='easy','Failed score read does not block independent difficulty write');
+assert(loadDifficultyPreferences({getItem(){throw Error('Denied');},setItem(){throw Error('Denied');}},'hard')===null,'Unavailable storage does not prevent play');
+preferences.delete('night-siege-3d-best-normal');preferences.set('night-siege-3d-best',JSON.stringify(validScore));
+assert(loadDifficultyPreferences(storage,'normal')?.wave===3,'Legacy score remains available in Normal');
+assert(loadDifficultyPreferences(storage,'suicide')===null,'Legacy Normal scores do not leak into other difficulties');
+console.log('PASS: independent difficulty persistence, corrupted scores, denied storage and legacy score isolation.');

@@ -5,6 +5,7 @@ import { GameAudio } from './audio';
 import { Radar } from './radar';
 import { AimSmoother } from './controls';
 import { targetFeedback } from './feedback';
+import { loadDifficultyPreferences, type BestScore } from './preferences';
 
 const el = <T extends HTMLElement = HTMLElement>(id:string) => document.getElementById(id) as T;
 const canvas = el<HTMLCanvasElement>('world');
@@ -20,7 +21,7 @@ const audio = new GameAudio();
 let lastTime = performance.now(), sensitivity = 1, toastUntil = 0, hitUntil = 0, damageUntil = 0, lastStep = 0, lastWarning = -9;
 const held = {left:false,right:false,up:false,down:false,fire:false};
 let drag: {id:number;x:number;y:number;distance:number} | null = null;
-let best: {wave:number;kills:number;time:number}|null = null;
+let best: BestScore | null = null;
 try {
     sensitivity = Math.max(.5,Math.min(2,Number(localStorage.getItem('night-siege-3d-sensitivity'))||1));
     const assist = localStorage.getItem('night-siege-3d-assist');
@@ -147,10 +148,7 @@ el('pauseBtn').addEventListener('click',togglePause);el('shopPauseBtn').addEvent
 pauseDialog.addEventListener('cancel',event=>{event.preventDefault();togglePause();});
 function loadDifficulty(){
     const difficulty=difficultySelect.value as Difficulty;
-    best=null;try{const stored=JSON.parse(localStorage.getItem(`night-siege-3d-best-${difficulty}`)||(difficulty==='normal'?localStorage.getItem('night-siege-3d-best'):null)||'null');
-        if(stored&&Number.isInteger(stored.wave)&&stored.wave>0&&Number.isInteger(stored.kills)&&stored.kills>=0&&Number.isFinite(stored.time)&&stored.time>=0)best=stored;
-        localStorage.setItem('night-siege-3d-difficulty',difficulty);
-    }catch{}
+    best=null;try{best=loadDifficultyPreferences(localStorage,difficulty);}catch{}
     const descriptions={easy:'Fewer drones, slower approaches, longer spawn intervals.',normal:'Standard waves and enemy speed.',hard:'More drones, faster approaches, shorter spawn intervals.',suicide:'Overwhelming waves, much faster drones and rapid spawning.'};
     el('difficultyHelp').textContent=descriptions[difficulty];
     game=new Siege(Math.random,difficulty);showBest();updateHud();
