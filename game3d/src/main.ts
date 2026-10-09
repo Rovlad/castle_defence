@@ -2,9 +2,12 @@ import './style.css';
 import { Arena } from './arena';
 import { Siege, type Upgrade } from './model';
 import { GameAudio } from './audio';
+import { Radar } from './radar';
 
 const el = <T extends HTMLElement = HTMLElement>(id:string) => document.getElementById(id) as T;
 const canvas = el<HTMLCanvasElement>('world');
+const radarCanvas = el<HTMLCanvasElement>('radarCanvas');
+const radar = new Radar(radarCanvas);
 const settings = el<HTMLDialogElement>('settings'),resupply = el<HTMLDialogElement>('resupply'),defeat = el<HTMLDialogElement>('defeat');
 let game = new Siege(), arena: Arena | null = null;
 const audio = new GameAudio();
@@ -59,6 +62,8 @@ function updateHud(){
         game.nextArrival===null?'All spawned':`Next in ${game.nextArrival.toFixed(1)}s`;
     const degrees=(Math.round(game.yaw*180/Math.PI)+360)%360,points=['N','NE','E','SE','S','SW','W','NW'];
     el('bearing').textContent=`${points[Math.round(degrees/45)%8]} · ${String(degrees).padStart(3,'0')}°`;
+    el('radarTargets').textContent=`${game.enemies.length} ${game.enemies.length===1?'target':'targets'}`;
+    radarCanvas.setAttribute('aria-label',`Radar: ${game.enemies.length} approaching targets. Searchlight bearing ${degrees} degrees. North is up.`);
     if(game.phase==='resupply'){
         const wait=Math.max(0,Math.ceil(4-game.resupplyElapsed));
         el<HTMLButtonElement>('nextBtn').disabled=!game.chosen||wait>0;
@@ -145,7 +150,7 @@ window.addEventListener('keydown',event=>{
 window.addEventListener('keyup',event=>{if(keyMap[event.code])held[keyMap[event.code]]=false;if(event.code==='Space'){held.fire=false;if(event.target===el('fireBtn'))event.preventDefault();}});
 window.addEventListener('blur',clearInput);
 document.addEventListener('visibilitychange',()=>{clearInput();lastTime=performance.now();if(document.hidden)audio.suspend();else void audio.unlock();});
-window.addEventListener('resize',()=>arena?.engine.resize());
+window.addEventListener('resize',()=>{arena?.engine.resize();radar.resize();});
 soundStatus();showBest();updateHud();
 try{
     arena=new Arena(canvas);
@@ -160,7 +165,7 @@ try{
                 if(nearest&&nearest.d<28&&game.elapsed-lastStep>.5){audio.effect('step',Math.sin(Math.atan2(nearest.x,nearest.z)-game.yaw));lastStep=game.elapsed;}
             } else game.tick(dt);
         }
-        arena!.update(game,document.hidden||settings.open?0:dt);arena!.render();updateHud();
+        arena!.update(game,document.hidden||settings.open?0:dt);arena!.render();radar.draw(game);updateHud();
         el('hitFlash').style.opacity=now<hitUntil?'1':'0';el('damageFlash').style.opacity=now<damageUntil?'1':'0';
         if(now>toastUntil)el('toast').textContent='';
     };

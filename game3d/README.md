@@ -14,6 +14,7 @@ The committed build is served at `/castle_defence/3d/` on GitHub Pages once merg
 - Clear a wave to repair one health and choose one upgrade: searchlight width, rotation speed or ammunition. After four seconds, explicitly start the next wave. A new run resets upgrades.
 - Settings pauses play and contains sound, a test chime, sensitivity and graphics quality. Hidden tabs pause simulation. Sound starts after a gesture and attempts the playback audio session on supported iOS versions. Actual iPhone audio output still needs a device test.
 - The bottom HUD shows resolved enemies, remaining enemies and elapsed wave time. Best results stay on the opening screen and are local to this browser.
+- The radar stays north-up with the castle at its centre. The gold sector follows the searchlight heading and width; coral markers show all live targets, including those outside the beam. Markers move inward as targets approach, pulse red nearby, and disappear after a kill or breach. Rings identify armored enemies and diamonds identify heavies.
 
 ## Develop and verify
 
