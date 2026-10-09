@@ -1,6 +1,8 @@
 # Castle Defense: Night Siege
 
-A standalone night-defence browser game with a searchlight, finite waves and upgrades. All gameplay, artwork and audio live in index.html; no build step or runtime dependencies.
+A night-defence browser game with a searchlight, finite waves and upgrades. The original 2D game lives in index.html with no build step or runtime dependencies.
+
+A separate **[Night Siege 3D](https://rovlad.github.io/castle_defence/3d/)** adds a fixed first-person turret: rotate your gun and searchlight, aim up/down and shoot approaching enemies. Desktop and touch controls, finite waves, upgrades and sound settings are included. The player cannot walk. See [game3d/README.md](game3d/README.md) for source/build instructions; `3d/` is the committed GitHub Pages build.
 
 ## Play
 

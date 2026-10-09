@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#09131f"><title>Night Siege · 3D</title>
+<meta name="description" content="Hold the castle from a fixed first-person gun position. Rotate your searchlight, aim and defend against waves from the darkness.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2309131f'/%3E%3Cpath d='M7 25V10h4v4h3V7h4v7h3v-4h4v15z' fill='%23eac888'/%3E%3C/svg%3E">
+  <script type="module" crossorigin src="./assets/_virtual/modulepreload-polyfill-B5Qt9EMX.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/textureSampler-cXfk8RXk.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/observable.pure-DBGveyWL.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/internalTexture-Bg1hGDap.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/engineStore-DVpjPURY.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/logger-BnMU3ljH.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/shaderStore-gCwyk3ij.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/domManagement-B8HhVNMy.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/WebGL/webGLPipelineContext-6KPrKL2S.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/devTools-Maroi9lB.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/abstractEngine.functions-dz-Wajfv.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/thinEngine.functions-D3Mqqlsc.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/shaderCodeNode-DL7hZPQl.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/shaderCodeCursor-Dt9LOyTP.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/shaderCodeConditionNode-DavSMVgd.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/shaderCodeTestNode-B3U1kR36.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/Expressions/shaderDefineExpression-D9RsexZH.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/Expressions/Operators/shaderDefineIsDefinedOperator-D8tr26F9.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/Expressions/Operators/shaderDefineOrOperator-BwMvIlD3.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/Expressions/Operators/shaderDefineAndOperator-nCr4x8qK.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/Expressions/Operators/shaderDefineArithmeticOperator-BgaEOdfP.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Processors/shaderProcessor-CJbr_oTf.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/effect.functions-B1e6mvp0.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/timingTools-BbGBYNDj.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/effect.pure-DUGpYt8O.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/performanceConfigurator-XDt4Zpf4.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/precisionDate-BRTaLtsB.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/States/depthCullingState-e6oN9Uz5.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/States/stencilStateComposer-BocI_dXE.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/States/stencilState-DNgTVvN6.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/States/alphaCullingState-CQRZjRTC.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/abstractEngine.pure-Dw9Oetnp.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/drawWrapper.functions-BcR47R3S.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/WebGL/webGLShaderProcessors-C8hbgQJZ.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/WebGL/webGL2ShaderProcessors-DOZ69AmY.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Buffers/dataBuffer-Br1YCvIy.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/WebGL/webGLDataBuffer-BPMp0ixv.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/tools.functions-B6KSQRoS.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/WebGL/webGLHardwareTexture-DLEwwMsW.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/textureHelper.functions-CmXYcWd4.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/thinEngine.pure-CC13Snz8.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/performanceMonitor-CjdWGKJ5.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/engine.common-C-TkSKLb.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/perfCounter-CSb5DxGa.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.dom.pure-BabNdKPE.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.renderPass.pure-CjotQVN_.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/engine.pure-BdM7e9m7.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.alpha.pure-C38cDv4D.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.alpha-BRZVoKyv.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.alphaToCoverage.pure-BsA5UsEZ.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.alphaToCoverage-D_0BBqW7.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.rawTexture.pure-CdaqF64e.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.rawTexture-D6rx0vM_.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.readTexture.pure-BZMhbACt.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.readTexture-IKg4Pb9p.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.dynamicBuffer.pure-BPTu7vB7.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.dynamicBuffer-DneU8SoO.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.cubeTexture.pure--H_X7Avl.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.cubeTexture-C33ce9qF.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/renderTargetWrapper-BQqXORoC.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/WebGL/webGLRenderTargetWrapper-CALPGY6D.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.renderTarget.pure-nlym36VX.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.renderTarget-CkxDf0Dy.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.renderTargetTexture.pure-DMiJLpZK.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.renderTargetTexture-BTcEW_KE.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.renderTargetCube.pure-Dx_Nkyme.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.renderTargetCube-D3gdFFcE.js"></script>
+  <script type="module" crossorigin src="./assets/_virtual/preload-helper-C7L2DPRd.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.constants-BRPrmpj0.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/arrayTools-DBJCziXc.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.scalar.functions-DRjLDSwO.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/ThinMaths/thinMath.matrix.functions-XMvfq-wg.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/typeStore-zMoL6YBL.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.vector.pure-CBXzJvIm.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/sphericalPolynomial.pure-bL_vWm-r.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/tslib.es6-BT3dzhyh.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/decorators.functions-BARk8t8U.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/decorators-Do8s7P9y.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/guid-DfK_2nXf.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.size-CNa6pEOg.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/thinTexture-BNxdMZtb.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/andOrNotEvaluator-BzrlqPVy.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/tags-BSFslE7l.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.color.pure-CKhdp6Cw.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/decorators.serialization-ClkJimgR.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/baseTexture.pure-DnyNzZTj.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.prefilteredCubeTexture.pure-GgELxgvo.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.prefilteredCubeTexture-w24MnI3G.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.uniformBuffer.pure-Bf-JtjTd.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.uniformBuffer-KDYdZEyS.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.loadingScreen.pure-DaLhEGSw.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.loadingScreen-D5vHsPo9.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.dom-lvCGpT_9.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.states.pure-DGfNB0P3.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.states-D8BJlouN.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.stencil.pure-D9Z87TFV.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.stencil-C8lQI9LC.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.renderPass-BxhMMudj.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.texture.pure-C0dhp7n4.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.texture-CiVh9120.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/webRequest-UjtwP5wm.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/filesInputStore-CjiW6fbU.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/retryStrategy-sybRlkyc.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/error-DLRsncOr.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/stringTools-CloWIKMz.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/halfFloat-C3j0JM4p.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Buffers/bufferUtils-OR6vSTgb.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/fileTools.pure-pLrCsgam.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.loadFile.pure-BMCPepil.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.loadFile-TFbqnQsI.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/Loaders/textureLoaderManager-DvubT-Y3.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.textureLoaders.pure-4eO_-GP9.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/AbstractEngine/abstractEngine.textureLoaders-CZx-o2U1.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/thinEngine.scissor.pure-4pgyGSc4.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/thinEngine.scissor-DbATS2XS.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/deepCopier-C0X5yTiB.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/instantiationTools-VtFaPyi3.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/tools.pure-BZYxxset.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/smartArray-DNBFVLtS.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/stringDictionary-CP0jps5S.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/colorTemperature.functions-CNkHQ69J.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/colorCurves.functions-Bw2XrbPz.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/colorCurves.pure-LF8xjm67.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/imageProcessingConfiguration.functions-Bc5tA3Cy.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/imageProcessingConfiguration.pure-BsV2pwyH.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/uniformBuffer-Co7-d3Ko.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Buffers/buffer.pure-BsnZNhx6.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Collisions/pickingInfo-Bh0R_IR0.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Actions/actionEvent-C6S4Vinb.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/PostProcesses/postProcessManager-Cwy0goZk.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/floatingOriginMatrixOverrides-CQt2HlO-.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Rendering/renderingGroup-DNKoQaGR.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Rendering/renderingManager-BY5Z1R8S.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/sceneComponent-B5zDWZ7i.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Events/pointerEvents-2WeP6jWr.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Actions/abstractActionManager-LKC6P6pB.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Events/keyboardEvents-DWs0lvO6.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/DeviceInput/InputDevices/deviceEnums-CtMga_SQ.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Events/deviceInputEvents-CItRz2RP.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/DeviceInput/eventFactory-DdBvbpSA.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/DeviceInput/nativeDeviceInputSystem-CGJdIybN.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/DeviceInput/webDeviceInputSystem-CJzwdVmd.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/DeviceInput/InputDevices/deviceSource-Dg9FrWtS.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/DeviceInput/internalDeviceSourceManager.pure-Bpu7XGsD.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/DeviceInput/InputDevices/deviceSourceManager-uoK5Cx2a.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/import.helper-BgKKnb4b.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Inputs/scene.inputManager-D-l0gfOl.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.plane-DFULaVFC.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.frustum-BCHErPVG.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/uniqueIdGenerator-DPwtMuOE.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/lightConstants-lFykbEVr.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Inputs/pointerPickingConfiguration-DtowAFYY.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/scene.pure-DvsYGelR.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/scene-Ckuxfm3a.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/node-DK_gmIls.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.viewport-C4b5vEkE.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/camera.pure-D_FvEAEj.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.axis-C8Zkv6A8.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/cameraMovement-DUPdMCvo.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/inputMapper-C9UMdK0q.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/targetCameraMovement-8zZ_eU3E.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/targetCamera.pure-OkvjNeOK.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/cameraInputsManager-CDM58y__.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/Inputs/freeCameraKeyboardMoveInput-DxuT2GpD.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/Inputs/freeCameraMouseInput-DVs7GWv7.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/Inputs/BaseCameraMouseWheelInput-CvgtOIvg.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/Inputs/freeCameraMouseWheelInput-HMhHYDTu.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/Inputs/freeCameraTouchInput-CNWceeLm.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/freeCameraInputsManager.pure-B7oA5EUW.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/freeCamera.pure-B8GTzRUj.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Cameras/freeCamera-C0j6ifA2.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.color-DIumhuAM.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.vector-6nUncOPT.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/coroutine-BsgImUxp.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Collisions/intersectionInfo-C0BotsXa.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Culling/boundingBox-Cj_X6y_8.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Culling/boundingSphere-CeTcZ-IQ.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Culling/boundingInfo-I672Qg5j.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Maths/math.functions-Bo1nkbO7.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/drawWrapper-DAkOgLMx.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/subMesh.pure-C-hg-8rr.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/mesh.vertexData-CxDzJmgN.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Loading/sceneLoaderFlags-CforZNMQ.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/geometry-DFKwO_T3.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/transformNode.pure-B9jfAF2x.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Collisions/meshCollisionData-BQURBBMO.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/abstractMesh.pure-D9FiVVvk.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/materialStencilState-EZW7l56Z.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/clipPlaneMaterialHelper-CTNG1VyG.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/materialFlags-DS_k5p0-.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/materialHelper.functions-CiyOtevC.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/material.pure-yZtojg_U.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/materialHelper.geometryrendering-w2zH11EE.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/multiMaterial.pure-ocdcvsD_.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/meshLODLevel-DFp3lQtv.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/mesh.pure-Cc1GsDe1.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/Builders/boxBuilder.pure-_IhbFQ-y.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/Builders/boxBuilder-CXKU6bZ_.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/Builders/sphereBuilder.pure-BtgMvDXP.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/Builders/sphereBuilder-CzHrJkfT.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/Builders/cylinderBuilder.pure-DwY8x5tu.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/Builders/cylinderBuilder-C7bQT9GP.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/groundMesh.pure-C6HxgM7W.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/Builders/groundBuilder.pure-7x-vH6eK.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/Builders/groundBuilder-ysTlS1Np.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/prePassConfiguration-C7U2Y1hT.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/imageProcessingConfiguration.defines-B44Vy00r.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/materialDefines-CwsEkvAi.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/pushMaterial-2HcqAwt6.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/effectFallbacks-BqAekZwN.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/materialPluginManager.pure-Do43YQDe.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/materialPluginBase.pure-BTlvHuOE.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/material.detailMapConfiguration-BIrsw4SS.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/vertexPullingHelper.functions-CxZZiqvh.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/shaderImportLoader-ZuT82Hxn.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/uv.defines-B7i2hNMX.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/prepass.defines-DEIlmP24.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/imageProcessing-kY4VOkft.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/standardMaterial.pure-CYUo0pB-.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/standardMaterial-DeplQ-X_.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/light-CKFoOLcq.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/hemisphericLight.pure-BJ5cRT6m.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/hemisphericLight-Crl9kZL0.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/shadowLight-CeTDsZRz.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/directionalLight.pure-BivGRBgK.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/directionalLight-DdGqhhU0.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/copyTools-BTLj3WHq.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/texture.pure-CMzEv88s.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/spotLight.pure-Bht_yKjd.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/spotLight-DdCQETqs.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/pointLight.pure-Byr1epzo.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/pointLight-CTs3Bxlu.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Meshes/transformNode-CA7PuPdm.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Rendering/objectRenderer-D4AQhiab.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/renderTargetTexture.pure-bP3qng5U.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/effectRenderer.pure-CALtO4V_.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/PostProcesses/postProcess.pure-u-CCBm-I.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/PostProcesses/thinBlurPostProcess-DbWEHrYB.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/PostProcesses/blurPostProcess.pure-DpGKArI1.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.pure-Baw62Xc5.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/Shadows/shadowGenerator-qj9qZ3QF.js"></script>
+  <script type="module" crossorigin src="./assets/src/model-DGnyWCDt.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.dynamicTexture.pure-3K3gaqCc.js"></script>
+  <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/dynamicTexture.pure-Bjcpw6u0.js"></script>
+  <script type="module" crossorigin src="./assets/src/arena-NtNSzbas.js"></script>
+  <script type="module" crossorigin src="./assets/src/audio-w-hW23uB.js"></script>
+  <script type="module" crossorigin src="./assets/src/main-BFqqnKp4.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/src/style-DuhWFo3w.css">
+</head><body>
+<canvas id="world" aria-label="3D castle battlefield"></canvas>
+<div id="hud">
+  <div class="topline"><div><span class="eyebrow">NIGHT SIEGE</span><strong>Wave <span id="wave">1</span></strong></div>
+    <div class="resources"><span>Castle <b id="health">3 / 3</b></span><span>Ammo <b id="ammo">3 / 3</b></span></div>
+    <button id="settingsBtn" class="icon" aria-label="Settings">⚙</button></div>
+  <div id="crosshair" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div id="hitFlash" aria-hidden="true"></div><div id="damageFlash" aria-hidden="true"></div>
+  <div id="toast" role="status"></div>
+  <div class="bottomline"><div><span class="eyebrow">WAVE PROGRESS</span><strong id="progressText">0 / 5</strong><progress id="progress" max="5" value="0"></progress></div>
+    <div><span class="eyebrow">WAVE TIME</span><strong id="time">0:00</strong><small id="arrival">Next in 2.5s</small></div><div><span class="eyebrow">REMAINING</span><strong id="remaining">5</strong></div>
+    <div class="bearing"><span class="eyebrow">BEARING</span><strong id="bearing">N · 000°</strong></div></div>
+</div>
+<div id="mobileControls"><div class="turnButtons"><button id="leftBtn" aria-label="Rotate left">◀</button><button id="rightBtn" aria-label="Rotate right">▶</button></div>
+  <span>Drag to aim</span><button id="fireBtn">FIRE</button></div>
+<section id="screen" class="overlay"><div class="card">
+  <span class="eyebrow">FIXED-POSITION DEFENCE</span><h1>Night Siege<span>3D</span></h1>
+  <p class="intro">One gun. One light.<br>Hold the castle against the darkness.</p>
+  <p class="instructions">Stay at your gun position. Rotate the searchlight and aim at approaching enemies.</p>
+  <p class="desktopHelp">Mouse drag or arrow keys to aim. Click or Space to fire. No walking controls.</p>
+  <p class="touchHelp">Drag the battlefield to aim. Tap FIRE to shoot. Hold the arrow buttons to turn.</p>
+  <button id="startBtn" class="primary" disabled>Loading battlefield…</button><button id="startSettingsBtn" class="textButton">Settings</button>
+  <a class="backLink" href="../">Play the original 2D game</a><div id="best"></div>
+</div></section>
+<dialog id="settings"><h2>Settings</h2><p>The siege pauses while you adjust settings.</p>
+  <div class="settingRow"><label for="soundBtn">Game sound</label><button id="soundBtn">Sound on</button></div>
+  <button id="testSoundBtn">Test sound</button><p id="soundStatus" role="status"></p>
+  <div class="settingRow"><label for="sensitivity">Aim sensitivity</label><input id="sensitivity" type="range" min="0.5" max="2" step="0.1" value="1"></div>
+  <div class="settingRow"><label for="quality">Graphics</label><select id="quality"><option value="auto">Automatic</option><option value="low">Low</option><option value="high">High</option></select></div>
+  <button id="closeSettingsBtn" class="primary">Done</button></dialog>
+<dialog id="resupply"><span class="eyebrow">RESUPPLY</span><h2 id="waveTitle">Wave cleared</h2><p id="repairText"></p>
+  <div class="upgradeChoices"><button data-upgrade="beam"><b>Wider searchlight</b><small>Reveal more of the darkness.</small></button>
+    <button data-upgrade="turn"><b>Faster turret</b><small>Turn and track enemies faster.</small></button>
+    <button data-upgrade="ammo"><b>Extra ammunition</b><small>Add a bullet slot, up to six.</small></button></div>
+  <p id="resupplyStatus" role="status"></p><button id="nextBtn" class="primary" disabled>Start next wave</button></dialog>
+<dialog id="defeat"><span class="eyebrow">THE CASTLE HAS FALLEN</span><h2>Night closes in.</h2><p id="result"></p><button id="restartBtn" class="primary">Defend again</button><a class="backLink" href="../">Original 2D game</a></dialog></body></html>
