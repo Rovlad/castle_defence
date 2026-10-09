@@ -1,6 +1,7 @@
 import { Siege, STATION, segmentHit, aimDirection, flightHeight, flightMotion, UPGRADES, type Enemy } from './src/model.ts';
 import { radarPoint, radarSector } from './src/radar.ts';
 import { AimSmoother } from './src/controls.ts';
+import { targetFeedback } from './src/feedback.ts';
 function assert(condition:unknown,message:string) {if(!condition)throw Error(message);}
 const advance=(g:Siege,seconds:number)=>{for(let i=0;i<Math.ceil(seconds/.025);i++)g.tick(.025);};
 assert(segmentHit({x:0,y:0,z:0},{x:10,y:0,z:0},{x:5,y:0,z:0},1)===.4,'Swept bullet hits between frames');
@@ -68,9 +69,22 @@ for(const kind of ['scout','armored','heavy'] as const){
     let previous=46;
     for(let i=0;i<500;i++){closing.tick(.025);if(!closing.enemies.length)break;const d=Math.hypot(closing.enemies[0].x,closing.enemies[0].z);assert(d<previous,'Each flight pattern makes progress toward the castle');previous=d;}
 }
+const upgradeLimits = {beam:11,turn:6,ammo:3,damage:2,velocity:2,blast:1,jammer:1};
+const cappedValues = {beam:Math.PI/2,turn:2.9,ammo:6,damage:3,velocity:100,blast:4,jammer:true};
+const loadoutValue=(g:Siege,kind:typeof UPGRADES[number])=>({beam:g.beam,turn:g.turnSpeed,ammo:g.capacity,damage:g.damage,velocity:g.projectileSpeed,blast:g.blastRadius,jammer:g.jammerOwned})[kind];
+const clearWave=(g:Siege)=>{g.spawned=g.waveSize;g.enemies=[];g.tick(.025);assert(g.phase==='resupply'&&g.chosen===null,'Fresh wave clear permits a new selection');};
 for(const kind of UPGRADES){
-    const upgraded=new Siege();upgraded.phase='resupply';assert(upgraded.upgrade(kind)&&upgraded.chosen===kind,`${kind} upgrade equips`);
-    assert(!upgraded.upgrade(kind),'Upgrade cannot be selected twice in one break');
+    const upgraded=new Siege();upgraded.start();clearWave(upgraded);
+    for(let count=0;count<upgradeLimits[kind];count++){
+        assert(upgraded.canUpgrade(kind),`${kind} remains available below its cap`);
+        assert(upgraded.upgrade(kind)&&upgraded.chosen===kind,`${kind} upgrade equips`);
+        assert(!upgraded.upgrade(kind),'Upgrade cannot be selected twice in one break');
+        advance(upgraded,4.1);assert(upgraded.nextWave(),'Each upgrade gets a fresh resupply selection');clearWave(upgraded);
+    }
+    const value=loadoutValue(upgraded,kind),expected=cappedValues[kind];
+    assert(typeof value==='number'&&typeof expected==='number'?Math.abs(value-expected)<1e-9:value===expected,`${kind} reaches its expected cap`);
+    assert(!upgraded.canUpgrade(kind)&&!upgraded.upgrade(kind),`${kind} rejects another selection in a fresh break at its cap`);
+    assert(upgraded.chosen===null&&loadoutValue(upgraded,kind)===value,`${kind} cap rejection preserves loadout and selection`);
 }
 const strong=new Siege();strong.start();strong.damage=3;strong.enemies=[target(100,3)];strong.pitch=combat.pitch;strong.fire();advance(strong,.4);
 assert(strong.kills===1,'Stronger shot destroys three-hit armor');
@@ -79,7 +93,16 @@ assert(Math.abs(Math.hypot(fast.bullets[0].pos.x,fast.bullets[0].pos.y-STATION.y
 const explosive=new Siege();explosive.start();explosive.damage=2;explosive.blastRadius=4;explosive.enemies=[target(100,2),target(101,1,2,20),target(102,2,3,20),target(103,1,6,20)];
 explosive.pitch=combat.pitch;explosive.fire();advance(explosive,.4);
 assert(explosive.kills===2&&explosive.enemies.find(e=>e.id===102)?.hp===1&&explosive.enemies.find(e=>e.id===103)?.hp===1,'Splash damages nearby targets once and leaves distant targets intact');
-assert(explosive.drainEvents().filter(e=>e.kind==='blast').length===1,'One explosive impact per shell');
+const explosiveEvents=explosive.drainEvents();
+assert(explosiveEvents.filter(e=>e.kind==='blast').length===1,'One explosive impact per shell');
+assert(explosiveEvents.at(-1)?.kind==='hit'&&explosiveEvents.at(-1)?.hp===1,'Splash batch ends with damage to surviving armor');
+for(const events of [explosiveEvents,[...explosiveEvents].reverse()]){
+    const feedback=targetFeedback(events);
+    assert(feedback?.text==='TARGET DOWN'&&feedback.duration===650,'Kill feedback wins over splash hits in either event order');
+}
+assert(targetFeedback([{kind:'hit',hp:2}])?.text==='ARMOR HIT · 2 HP','Surviving armor reports remaining health');
+assert(targetFeedback([{kind:'hit',hp:0}])?.text==='HIT','Generic hit feedback remains available');
+assert(targetFeedback([{kind:'shot'},{kind:'blast'}])===null,'Unrelated events do not replace target feedback');
 const damaged=new Siege();damaged.start();damaged.enemies=[target(100,3)];damaged.pitch=combat.pitch;damaged.fire();advance(damaged,.30);
 assert(damaged.enemies[0].hp===2&&(damaged.enemies[0].hitFlash||0)>0,'Armor impact starts a short damage flash');advance(damaged,.3);
 assert(damaged.enemies[0].hitFlash===0,'Damage flash expires');

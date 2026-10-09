@@ -1,0 +1,1 @@
+function d(n){if(n.some(i=>i.kind==="kill"))return{text:"TARGET DOWN",duration:650};const t=n.find(i=>i.kind==="hit"&&(i.hp??0)>0)??n.find(i=>i.kind==="hit");return t?{text:t.hp&&t.hp>0?`ARMOR HIT · ${t.hp} HP`:"HIT",duration:450}:null}export{d as targetFeedback};

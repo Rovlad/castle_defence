@@ -4,6 +4,7 @@ import { Siege, type Upgrade } from './model';
 import { GameAudio } from './audio';
 import { Radar } from './radar';
 import { AimSmoother } from './controls';
+import { targetFeedback } from './feedback';
 
 const el = <T extends HTMLElement = HTMLElement>(id:string) => document.getElementById(id) as T;
 const canvas = el<HTMLCanvasElement>('world');
@@ -40,7 +41,7 @@ function showBest(){el('best').textContent=best?`Best defence: wave ${best.wave}
 function shoot(){
     if(blocked())return;
     const pending=touchAim.flush();game.aim(pending.x,pending.y);
-    if(aimAssist&&matchMedia('(pointer:coarse)').matches)game.assistAim(.025);
+    if(aimAssist)game.assistAim(.025);
     const wasRunning=audio.context?.state==='running';
     const ready=audio.unlock();
     if(game.fire()){
@@ -92,11 +93,12 @@ function updateHud(){
     }
 }
 function consumeEvents(){
-    for(const event of game.drainEvents()){
+    const events=game.drainEvents();
+    for(const event of events){
         arena?.event(event);
         if(event.kind==='shot')audio.effect('shot');
-        if(event.kind==='hit'){audio.effect('hit');hitUntil=performance.now()+450;el('targetFeedback').textContent=event.hp&&event.hp>0?`ARMOR HIT · ${event.hp} HP`:'HIT';}
-        if(event.kind==='kill'){audio.effect('explosion');hitUntil=performance.now()+650;el('targetFeedback').textContent='TARGET DOWN';}
+        if(event.kind==='hit')audio.effect('hit');
+        if(event.kind==='kill')audio.effect('explosion');
         if(event.kind==='blast')audio.effect('explosion');
         if(event.kind==='pulse'){audio.effect('clear');toast('Jammer active · drones slowed for 4 seconds');}
         if(event.kind==='breach'){audio.effect('breach');damageUntil=performance.now()+550;toast(`${game.health} castle health remaining`);}
@@ -112,6 +114,8 @@ function consumeEvents(){
             defeat.showModal();
         }
     }
+    const feedback=targetFeedback(events);
+    if(feedback){hitUntil=performance.now()+feedback.duration;el('targetFeedback').textContent=feedback.text;}
 }
 el('startBtn').addEventListener('click',start);
 function jam(){if(blocked())return;void audio.unlock();if(game.pulse()){consumeEvents();updateHud();}}
@@ -192,7 +196,7 @@ try{
             if(game.phase==='combat'){
                 const smooth=touchAim.take(dt);game.aim(smooth.x,smooth.y);
                 game.aim(((held.right?1:0)-(held.left?1:0))*game.turnSpeed*dt,((held.down?1:0)-(held.up?1:0))*game.turnSpeed*.45*dt);
-                if(aimAssist&&(drag||held.fire)&&matchMedia('(pointer:coarse)').matches)game.assistAim(dt);
+                if(aimAssist&&(drag||held.fire))game.assistAim(dt);
                 game.tick(dt);if(held.fire&&game.cooldown===0)shoot();consumeEvents();
                 const nearest=game.enemies.reduce<{x:number;z:number;d:number}|null>((best,e)=>{const d=Math.hypot(e.x,e.z);return !best||d<best.d?{x:e.x,z:e.z,d}:best;},null);
                 if(nearest&&nearest.d<28&&game.elapsed-lastStep>.5){audio.effect('engine',Math.sin(Math.atan2(nearest.x,nearest.z)-game.yaw));lastStep=game.elapsed;}
