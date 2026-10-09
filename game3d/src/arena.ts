@@ -50,13 +50,13 @@ export class Arena {
         const moonlight = new DirectionalLight('moonlight',new Vector3(.35,-1,.5),this.scene);moonlight.intensity = .25;
         moonlight.diffuse = new Color3(.47,.61,.83);
         this.spotlight = new SpotLight('searchlight',this.camera.position.clone(),new Vector3(0,-.1,1),Math.PI/5,3,this.scene);
-        this.spotlight.diffuse = new Color3(1,.91,.72);this.spotlight.intensity = 2.3;this.spotlight.range = 100;
+        this.spotlight.diffuse = new Color3(1,.91,.72);this.spotlight.intensity = 4.6;this.spotlight.range = 100;
         const beamTexture=new DynamicTexture('soft searchlight',{width:128,height:128},this.scene,false);
         const beamContext=beamTexture.getContext();
         const gradient=beamContext.createRadialGradient(64,64,24,64,64,64);
         gradient.addColorStop(0,'white');gradient.addColorStop(.55,'#ededed');gradient.addColorStop(1,'black');
         beamContext.fillStyle=gradient;beamContext.fillRect(0,0,128,128);beamTexture.update();
-        this.spotlight.projectionTexture=beamTexture;this.spotlight.exponent=1.5;
+        this.spotlight.projectionTexture=beamTexture;this.spotlight.exponent=1;
         this.shadow = new ShadowGenerator(512,this.spotlight);this.shadow.usePoissonSampling = true;this.shadow.darkness = .35;
         this.muzzle = new PointLight('muzzle',this.camera.position.clone(),this.scene);this.muzzle.intensity = 0;this.muzzle.diffuse = new Color3(1,.6,.17);this.muzzle.range = 12;
         this.buildLandscape();
