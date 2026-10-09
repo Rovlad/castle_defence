@@ -1,5 +1,7 @@
-import { Siege, STATION, segmentHit, aimDirection, flightHeight, type Enemy } from './src/model.ts';
+import { Siege, STATION, segmentHit, aimDirection, flightHeight, flightMotion, UPGRADES, type Enemy } from './src/model.ts';
 import { radarPoint, radarSector } from './src/radar.ts';
+import { AimSmoother } from './src/controls.ts';
+import { targetFeedback } from './src/feedback.ts';
 function assert(condition:unknown,message:string) {if(!condition)throw Error(message);}
 const advance=(g:Siege,seconds:number)=>{for(let i=0;i<Math.ceil(seconds/.025);i++)g.tick(.025);};
 assert(segmentHit({x:0,y:0,z:0},{x:10,y:0,z:0},{x:5,y:0,z:0},1)===.4,'Swept bullet hits between frames');
@@ -34,7 +36,7 @@ assert(waves.upgrade('ammo')&&waves.capacity===4,'Ammo upgrade works');assert(!w
 advance(waves,4.1);assert(waves.elapsed===elapsed,'Resupply does not inflate combat time');assert(waves.nextWave(),'Next wave after break and choice');
 assert(waves.wave===2&&waves.waveSize===7&&waves.waveElapsed===0&&waves.spawned===0,'Next wave resets counters');
 assert(waves.fire()&&waves.bullets.length===1,'Gun fires immediately in the next wave');
-waves.beam=Math.PI/2;waves.turnSpeed=2.9;waves.capacity=6;waves.spawned=waves.waveSize;waves.enemies=[];waves.tick(.025);advance(waves,4.1);
+waves.beam=Math.PI/2;waves.turnSpeed=2.9;waves.capacity=6;waves.damage=3;waves.projectileSpeed=100;waves.blastRadius=4;waves.jammerOwned=true;waves.spawned=waves.waveSize;waves.enemies=[];waves.tick(.025);advance(waves,4.1);
 assert(waves.chosen==='max'&&waves.nextWave(),'All-maxed upgrades cannot soft-lock continuation');
 const tiers=new Siege(()=>.25);tiers.wave=5;tiers.waveSize=3;tiers.start();
 for(let i=0;i<3;i++){advance(tiers,3);tiers.enemies.forEach(e=>e.speed=0);}
@@ -46,4 +48,70 @@ assert(radarPoint(0,0).x===80&&radarPoint(0,0).y===80,'Castle stays at radar cen
 assert(Math.abs(radarPoint(0,20).y-80)<Math.abs(north.y-80),'Approaching targets move inward');
 const sector=radarSector(Math.PI/2,Math.PI/5);
 assert(Math.abs(sector.start+sector.end)<1e-8&&Math.abs(sector.end-sector.start-Math.PI/5)<1e-8,'Radar beam points east and matches searchlight width');
-console.log('PASS: fixed station, flying-target heights and hitboxes, swept hits, armor, castle health, waves, upgrades, radar and timing.');
+const smoother=new AimSmoother();smoother.add(.3,.1);const first=smoother.take(.016);
+assert(first.x>0&&first.x<.3,'Touch input eases without an instant jump');const rest=smoother.flush();
+assert(Math.abs(first.x+rest.x-.3)<1e-9&&Math.abs(first.y+rest.y-.1)<1e-9,'Firing flushes the full pending aim');
+smoother.add(1,1);smoother.clear();assert(smoother.take(.1).x===0,'Pausing clears pending movement');
+const assisted=new Siege();assisted.start();assisted.enemies=[target(1,1,Math.sin(.035)*20,Math.cos(.035)*20)];
+assisted.pitch=Math.atan2(STATION.y-assisted.enemies[0].y,20);assisted.assistAim(.05);
+assert(assisted.yaw>0&&assisted.yaw<.035,'Near-crosshair assistance is gentle');
+assisted.yaw=0;assisted.enemies[0].reveal=0;assisted.assistAim(.05);assert(assisted.yaw===0,'Hidden drones receive no aim assistance');
+assisted.enemies[0].reveal=1;assisted.enemies[0].x=12;assisted.assistAim(.05);assert(assisted.yaw===0,'Aim assistance does not snap toward distant bearings');
+const warnings=new Siege();warnings.start();warnings.enemies=[{...target(10,1,0,-20),speed:4},{...target(11,1,9,0),speed:.2}];
+assert(warnings.threat?.enemy.id===10&&Math.abs(warnings.threat.bearing)>3,'Warning selects earliest breach and points behind');
+warnings.yaw=Math.PI;assert(Math.abs(warnings.threat!.bearing)<1e-8,'Warnings rotate with the turret');
+warnings.enemies=[target(1,1,0,30)];assert(warnings.threat===null,'Distant drones do not crowd the HUD');
+assert(flightMotion('scout',.7,2).drift>0&&flightMotion('scout',2,2).drift<0,'Scouts zigzag in both directions');
+assert(flightMotion('scout',1,1).drift===0&&flightMotion('armored',1,5).drift===0,'Opening scouts and armored drones fly steadily');
+assert(flightMotion('heavy',5,5).pace>flightMotion('heavy',3,5).pace,'Heavies have short attack runs');
+for(const kind of ['scout','armored','heavy'] as const){
+    const closing=new Siege();closing.wave=5;closing.waveSize=0;closing.start();closing.enemies=[{...target(55,1,0,46),kind,speed:3}];
+    let previous=46;
+    for(let i=0;i<500;i++){closing.tick(.025);if(!closing.enemies.length)break;const d=Math.hypot(closing.enemies[0].x,closing.enemies[0].z);assert(d<previous,'Each flight pattern makes progress toward the castle');previous=d;}
+}
+const upgradeLimits = {beam:11,turn:6,ammo:3,damage:2,velocity:2,blast:1,jammer:1};
+const cappedValues = {beam:Math.PI/2,turn:2.9,ammo:6,damage:3,velocity:100,blast:4,jammer:true};
+const loadoutValue=(g:Siege,kind:typeof UPGRADES[number])=>({beam:g.beam,turn:g.turnSpeed,ammo:g.capacity,damage:g.damage,velocity:g.projectileSpeed,blast:g.blastRadius,jammer:g.jammerOwned})[kind];
+const clearWave=(g:Siege)=>{g.spawned=g.waveSize;g.enemies=[];g.tick(.025);assert(g.phase==='resupply'&&g.chosen===null,'Fresh wave clear permits a new selection');};
+for(const kind of UPGRADES){
+    const upgraded=new Siege();upgraded.start();clearWave(upgraded);
+    for(let count=0;count<upgradeLimits[kind];count++){
+        assert(upgraded.canUpgrade(kind),`${kind} remains available below its cap`);
+        assert(upgraded.upgrade(kind)&&upgraded.chosen===kind,`${kind} upgrade equips`);
+        assert(!upgraded.upgrade(kind),'Upgrade cannot be selected twice in one break');
+        advance(upgraded,4.1);assert(upgraded.nextWave(),'Each upgrade gets a fresh resupply selection');clearWave(upgraded);
+    }
+    const value=loadoutValue(upgraded,kind),expected=cappedValues[kind];
+    assert(typeof value==='number'&&typeof expected==='number'?Math.abs(value-expected)<1e-9:value===expected,`${kind} reaches its expected cap`);
+    assert(!upgraded.canUpgrade(kind)&&!upgraded.upgrade(kind),`${kind} rejects another selection in a fresh break at its cap`);
+    assert(upgraded.chosen===null&&loadoutValue(upgraded,kind)===value,`${kind} cap rejection preserves loadout and selection`);
+}
+const strong=new Siege();strong.start();strong.damage=3;strong.enemies=[target(100,3)];strong.pitch=combat.pitch;strong.fire();advance(strong,.4);
+assert(strong.kills===1,'Stronger shot destroys three-hit armor');
+const fast=new Siege();fast.start();fast.projectileSpeed=100;fast.fire();fast.tick(.025);
+assert(Math.abs(Math.hypot(fast.bullets[0].pos.x,fast.bullets[0].pos.y-STATION.y,fast.bullets[0].pos.z)-3.4)<1e-8,'Velocity upgrade changes physical projectile speed');
+const explosive=new Siege();explosive.start();explosive.damage=2;explosive.blastRadius=4;explosive.enemies=[target(100,2),target(101,1,2,20),target(102,2,3,20),target(103,1,6,20)];
+explosive.pitch=combat.pitch;explosive.fire();advance(explosive,.4);
+assert(explosive.kills===2&&explosive.enemies.find(e=>e.id===102)?.hp===1&&explosive.enemies.find(e=>e.id===103)?.hp===1,'Splash damages nearby targets once and leaves distant targets intact');
+const explosiveEvents=explosive.drainEvents();
+assert(explosiveEvents.filter(e=>e.kind==='blast').length===1,'One explosive impact per shell');
+assert(explosiveEvents.at(-1)?.kind==='hit'&&explosiveEvents.at(-1)?.hp===1,'Splash batch ends with damage to surviving armor');
+for(const events of [explosiveEvents,[...explosiveEvents].reverse()]){
+    const feedback=targetFeedback(events);
+    assert(feedback?.text==='TARGET DOWN'&&feedback.duration===650,'Kill feedback wins over splash hits in either event order');
+}
+assert(targetFeedback([{kind:'hit',hp:2}])?.text==='ARMOR HIT · 2 HP','Surviving armor reports remaining health');
+assert(targetFeedback([{kind:'hit',hp:0}])?.text==='HIT','Generic hit feedback remains available');
+assert(targetFeedback([{kind:'shot'},{kind:'blast'}])===null,'Unrelated events do not replace target feedback');
+const damaged=new Siege();damaged.start();damaged.enemies=[target(100,3)];damaged.pitch=combat.pitch;damaged.fire();advance(damaged,.30);
+assert(damaged.enemies[0].hp===2&&(damaged.enemies[0].hitFlash||0)>0,'Armor impact starts a short damage flash');advance(damaged,.3);
+assert(damaged.enemies[0].hitFlash===0,'Damage flash expires');
+const jammer=new Siege();jammer.start();assert(!jammer.pulse(),'Jammer requires an upgrade');jammer.jammerOwned=true;
+jammer.enemies=[{...target(1,1,0,40),speed:4}];assert(jammer.pulse()&&!jammer.pulse(),'Jammer starts once and enforces its cooldown');jammer.tick(.025);
+assert(Math.abs(jammer.enemies[0].z-(40-4*.45*.025))<1e-8,'Active jammer slows incoming drones');
+const active=jammer.jamRemaining,cooldown=jammer.jamCooldown;jammer.phase='resupply';jammer.tick(.05);
+assert(jammer.jamRemaining===active&&jammer.jamCooldown===cooldown,'Ability timers freeze outside combat');jammer.phase='combat';advance(jammer,4.1);
+assert(jammer.jamRemaining===0&&jammer.jamCooldown>0,'Slowdown expires before recharge');
+jammer.enemies=[];jammer.waveSize=1000;advance(jammer,14);assert(jammer.jamCooldown===0&&jammer.pulse(),'Jammer recharges on combat time');
+assert(new Siege().damage===1&&!new Siege().jammerOwned,'Restart begins with the base loadout');
+console.log('PASS: stationary combat, swept hits, flying patterns, damage feedback, touch smoothing, aim assistance, directional warnings, waves, all seven upgrades, splash damage and jammer timing.');

@@ -36,6 +36,10 @@ export class Radar {
             ctx.beginPath(); ctx.arc(CENTER, CENTER, radius, 0, Math.PI * 2); ctx.stroke();
         }
         ctx.strokeStyle = '#233c4c';
+        if(game.jamRemaining>0){
+            const radius=RADIUS*((4-game.jamRemaining)%1);
+            ctx.strokeStyle='#86d8e3';ctx.globalAlpha=.7;ctx.beginPath();ctx.arc(CENTER,CENTER,radius,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;ctx.strokeStyle='#233c4c';
+        }
         ctx.beginPath(); ctx.moveTo(CENTER - RADIUS, CENTER); ctx.lineTo(CENTER + RADIUS, CENTER);
         ctx.moveTo(CENTER, CENTER - RADIUS); ctx.lineTo(CENTER, CENTER + RADIUS); ctx.stroke();
 
@@ -70,5 +74,11 @@ export class Radar {
         ctx.fillStyle = '#dce8ee'; ctx.fillRect(CENTER - 3.5, CENTER - 3.5, 7, 7);
         ctx.fillStyle = '#a9c0cf'; ctx.font = '10px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText('N', CENTER, 8); ctx.fillText('S', CENTER, 153); ctx.fillText('E', 153, CENTER); ctx.fillText('W', 7, CENTER);
+        const threat = game.threat;
+        if (threat) {
+            const angle = Math.atan2(threat.enemy.x,threat.enemy.z)-Math.PI/2;
+            ctx.strokeStyle='#ff8876';ctx.lineWidth=3;ctx.globalAlpha=.65+.35*Math.sin(threat.enemy.age*7)**2;
+            ctx.beginPath();ctx.arc(CENTER,CENTER,RADIUS+4,angle-.18,angle+.18);ctx.stroke();ctx.globalAlpha=1;
+        }
     }
 }

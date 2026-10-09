@@ -244,28 +244,33 @@
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/PostProcesses/blurPostProcess.pure-DpGKArI1.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent.pure-Baw62Xc5.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Lights/Shadows/shadowGenerator-qj9qZ3QF.js"></script>
-  <script type="module" crossorigin src="./assets/src/model-7Z63rZmx.js"></script>
+  <script type="module" crossorigin src="./assets/src/model-BRyIZ3lF.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.dynamicTexture.pure-3K3gaqCc.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/dynamicTexture.pure-Bjcpw6u0.js"></script>
-  <script type="module" crossorigin src="./assets/src/arena-BjP9D1-v.js"></script>
-  <script type="module" crossorigin src="./assets/src/audio-DmQtXFSP.js"></script>
-  <script type="module" crossorigin src="./assets/src/radar-DKZmzLg0.js"></script>
-  <script type="module" crossorigin src="./assets/src/main-CoYbtznf.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/src/style-B9NvEuO7.css">
+  <script type="module" crossorigin src="./assets/src/arena-DyUBGfdy.js"></script>
+  <script type="module" crossorigin src="./assets/src/audio-DAMA-gvL.js"></script>
+  <script type="module" crossorigin src="./assets/src/radar-BqCEVv4F.js"></script>
+  <script type="module" crossorigin src="./assets/src/controls-aItrG2Ij.js"></script>
+  <script type="module" crossorigin src="./assets/src/feedback-BN2qwkWt.js"></script>
+  <script type="module" crossorigin src="./assets/src/main-D6CEbKNc.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/src/style-CI7MtpJK.css">
 </head><body>
 <canvas id="world" aria-label="3D castle battlefield"></canvas>
 <div id="hud">
   <div class="topline"><div><span class="eyebrow">NIGHT SIEGE</span><strong>Wave <span id="wave">1</span></strong></div>
-    <div class="resources"><span>Castle <b id="health">3 / 3</b></span><span>Ammo <b id="ammo">3 / 3</b></span></div>
+    <div class="resources"><span>Castle <b id="health">3 / 3</b></span><span>Ammo <b id="ammo">3 / 3</b><small id="gunStatus">READY</small></span></div>
     <button id="settingsBtn" class="icon" aria-label="Settings">⚙</button></div>
   <div id="crosshair" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div id="targetFeedback" aria-hidden="true"></div>
   <aside id="radarPanel" aria-label="Castle radar">
     <div class="radarHeading"><span>RADAR</span><small id="radarTargets">0 targets</small></div>
     <canvas id="radarCanvas" role="img" aria-label="Radar: castle at the centre, north at the top."></canvas>
     <div class="radarLegend"><span>● Targets</span><span>▰ Beam</span></div>
+    <button id="jamBtn" hidden aria-label="Activate radar jammer">JAM · READY</button>
   </aside>
   <div id="hitFlash" aria-hidden="true"></div><div id="damageFlash" aria-hidden="true"></div>
   <div id="toast" role="status"></div>
+  <div id="threatIndicator" hidden><span id="threatArrow" aria-hidden="true">↑</span><span id="threatText" role="status"></span></div>
   <div class="bottomline"><div><span class="eyebrow">WAVE PROGRESS</span><strong id="progressText">0 / 5</strong><progress id="progress" max="5" value="0"></progress></div>
     <div><span class="eyebrow">WAVE TIME</span><strong id="time">0:00</strong><small id="arrival">Next in 2.5s</small></div><div><span class="eyebrow">REMAINING</span><strong id="remaining">5</strong></div>
     <div class="bearing"><span class="eyebrow">BEARING</span><strong id="bearing">N · 000°</strong></div></div>
@@ -276,7 +281,7 @@
   <span class="eyebrow">FIXED-POSITION DEFENCE</span><h1>Night Siege<span>3D</span></h1>
   <p class="intro">One gun. One light.<br>Hold the castle against the darkness.</p>
   <p class="instructions">Stay at your gun position. Rotate the searchlight and shoot down low-flying drones.</p>
-  <p class="desktopHelp">Mouse drag or arrow keys to aim. Click or Space to fire. No walking controls.</p>
+  <p class="desktopHelp">Mouse drag or arrow keys to aim. Click or Space to fire. P activates the radar jammer once equipped.</p>
   <p class="touchHelp">Drag the battlefield to aim. Tap FIRE to shoot. Hold the arrow buttons to turn.</p>
   <button id="startBtn" class="primary" disabled>Loading battlefield…</button><button id="startSettingsBtn" class="textButton">Settings</button>
   <a class="backLink" href="../">Play the original 2D game</a><div id="best"></div>
@@ -285,11 +290,17 @@
   <div class="settingRow"><label for="soundBtn">Game sound</label><button id="soundBtn">Sound on</button></div>
   <button id="testSoundBtn">Test sound</button><p id="soundStatus" role="status"></p>
   <div class="settingRow"><label for="sensitivity">Aim sensitivity</label><input id="sensitivity" type="range" min="0.5" max="2" step="0.1" value="1"></div>
+  <div class="settingRow"><label for="aimAssist">Gentle aim assistance</label><input id="aimAssist" type="checkbox"></div>
   <div class="settingRow"><label for="quality">Graphics</label><select id="quality"><option value="auto">Automatic</option><option value="low">Low</option><option value="high">High</option></select></div>
   <button id="closeSettingsBtn" class="primary">Done</button></dialog>
 <dialog id="resupply"><span class="eyebrow">RESUPPLY</span><h2 id="waveTitle">Wave cleared</h2><p id="repairText"></p>
   <div class="upgradeChoices"><button data-upgrade="beam"><b>Wider searchlight</b><small>Reveal more of the darkness.</small></button>
     <button data-upgrade="turn"><b>Faster turret</b><small>Turn and track enemies faster.</small></button>
-    <button data-upgrade="ammo"><b>Extra ammunition</b><small>Add a bullet slot, up to six.</small></button></div>
+    <button data-upgrade="ammo"><b>Extra ammunition</b><small>Add a bullet slot, up to six.</small></button>
+    <button data-upgrade="damage"><b>Stronger shots</b><small>+1 damage per shot, up to three.</small></button>
+    <button data-upgrade="velocity"><b>Faster rounds</b><small>Faster travel and less target leading.</small></button>
+    <button data-upgrade="blast"><b>Explosive shells</b><small>Hits deal 1 splash damage within 4m.</small></button>
+    <button data-upgrade="jammer"><b>Radar jammer</b><small>Slow drones for 4s. Recharge: 18s.</small></button></div>
+  <p id="loadout"></p>
   <p id="resupplyStatus" role="status"></p><button id="nextBtn" class="primary" disabled>Start next wave</button></dialog>
 <dialog id="defeat"><span class="eyebrow">THE CASTLE HAS FALLEN</span><h2>Night closes in.</h2><p id="result"></p><button id="restartBtn" class="primary">Defend again</button><a class="backLink" href="../">Original 2D game</a></dialog></body></html>
