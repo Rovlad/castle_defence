@@ -1,13 +1,17 @@
 export type V3 = { x: number; y: number; z: number };
 export type Phase = 'ready' | 'combat' | 'resupply' | 'lost';
 export type Upgrade = 'beam' | 'turn' | 'ammo';
-export type Enemy = { id: number; x: number; z: number; hp: number; maxHp: number; radius: number; speed: number; kind: 'runner' | 'armored' | 'heavy'; reveal: number; age: number };
+export type Enemy = { id: number; x: number; y: number; z: number; hp: number; maxHp: number; radius: number; speed: number; kind: 'scout' | 'armored' | 'heavy'; reveal: number; age: number };
 export type Bullet = { id: number; pos: V3; direction: V3; age: number };
 export type GameEvent = { kind: 'spawn' | 'shot' | 'hit' | 'kill' | 'breach' | 'clear' | 'lost'; id?: number; pos?: V3 };
 export const STATION: Readonly<V3> = Object.freeze({ x: 0, y: 5.8, z: 0 });
 export const SPAWN_RADIUS = 46;
 export const BREACH_RADIUS = 8;
 export const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
+export function flightHeight(kind: Enemy['kind'], age: number, id: number) {
+    const altitude = kind === 'heavy' ? 3.8 : kind === 'armored' ? 3.3 : 3;
+    return altitude + Math.sin(age * 1.8 + id * .7) * .24;
+}
 export function aimDirection(yaw: number, pitch: number): V3 {
     return { x: Math.sin(yaw) * Math.cos(pitch), y: -Math.sin(pitch), z: Math.cos(yaw) * Math.cos(pitch) };
 }
@@ -28,7 +32,7 @@ export function segmentHit(a: V3, b: V3, center: V3, radius: number): number | n
 export class Siege {
     phase: Phase = 'ready';
     wave = 1; health = 3; kills = 0; waveSize = 5; spawned = 0;
-    yaw = 0; pitch = .10; beam = Math.PI/5; turnSpeed = 1.4; capacity = 3;
+    yaw = 0; pitch = Math.atan2(STATION.y-3,SPAWN_RADIUS); beam = Math.PI/5; turnSpeed = 1.4; capacity = 3;
     elapsed = 0; waveElapsed = 0; spawnElapsed = 0; resupplyElapsed = 0; cooldown = 0;
     chosen: Upgrade | 'max' | null = null;
     enemies: Enemy[] = []; bullets: Bullet[] = []; events: GameEvent[] = [];
@@ -77,20 +81,22 @@ export class Siege {
         if (this.spawned < this.waveSize && this.spawnElapsed >= this.spawnDelay) {
             const angle = this.wave === 1 && this.spawned === 0 ? this.yaw : this.random()*Math.PI*2;
             const number = ++this.spawned;
-            const kind = this.wave >= 5 && number%3 === 0 ? 'heavy' : this.wave >= 3 && number%2 === 0 ? 'armored' : 'runner';
+            const kind = this.wave >= 5 && number%3 === 0 ? 'heavy' : this.wave >= 3 && number%2 === 0 ? 'armored' : 'scout';
             const hp = kind === 'heavy' ? 3 : kind === 'armored' ? 2 : 1;
-            const enemy: Enemy = { id:++this.nextId, x:Math.sin(angle)*SPAWN_RADIUS, z:Math.cos(angle)*SPAWN_RADIUS,
-                hp,maxHp:hp,kind,radius:kind==='heavy'?1.35:kind==='armored'?1.05:.82,
+            const id = ++this.nextId;
+            const enemy: Enemy = { id, x:Math.sin(angle)*SPAWN_RADIUS, y:flightHeight(kind,0,id), z:Math.cos(angle)*SPAWN_RADIUS,
+                hp,maxHp:hp,kind,radius:kind==='heavy'?1.35:kind==='armored'?1.05:.95,
                 speed:(2.8+(this.wave-1)*.20)*(kind==='heavy'?.65:kind==='armored'?.82:1),reveal:0,age:0 };
             this.enemies.push(enemy);this.spawnElapsed = 0;this.events.push({kind:'spawn',id:enemy.id});
         }
         const aim = aimDirection(this.yaw,this.pitch);
         for (const enemy of [...this.enemies]) {
             enemy.age += dt;
+            enemy.y = flightHeight(enemy.kind,enemy.age,enemy.id);
             const d = Math.hypot(enemy.x,enemy.z);
             if (d <= BREACH_RADIUS) {
                 this.enemies = this.enemies.filter(e=>e.id!==enemy.id);
-                this.health--;this.events.push({kind:'breach',id:enemy.id,pos:{x:enemy.x,y:1.1,z:enemy.z}});
+                this.health--;this.events.push({kind:'breach',id:enemy.id,pos:{x:enemy.x,y:enemy.y,z:enemy.z}});
                 if (this.health <= 0) { this.health = 0;this.phase = 'lost';this.bullets = [];this.events.push({kind:'lost'});return; }
                 continue;
             }
@@ -98,7 +104,7 @@ export class Siege {
             const ux = enemy.x/d, uz = enemy.z/d;
             enemy.x += (-ux-uz*drift)*enemy.speed*dt;
             enemy.z += (-uz+ux*drift)*enemy.speed*dt;
-            const ey = 1.35-STATION.y, distance = Math.hypot(enemy.x,ey,enemy.z);
+            const ey = enemy.y-STATION.y, distance = Math.hypot(enemy.x,ey,enemy.z);
             const dot = (enemy.x*aim.x+ey*aim.y+enemy.z*aim.z)/distance;
             enemy.reveal = dot >= Math.cos(this.beam/2) ? 1 : Math.max(0,enemy.reveal-dt/.4);
         }
@@ -109,12 +115,12 @@ export class Siege {
             bullet.pos = { x:old.x+bullet.direction.x*62*dt, y:old.y+bullet.direction.y*62*dt, z:old.z+bullet.direction.z*62*dt };
             let closest: Enemy | null = null, closestT = Infinity;
             for (const enemy of this.enemies) {
-                const t = segmentHit(old,bullet.pos,{x:enemy.x,y:1.35,z:enemy.z},enemy.radius+.12);
+                const t = segmentHit(old,bullet.pos,{x:enemy.x,y:enemy.y,z:enemy.z},enemy.radius+.12);
                 if (t !== null && t < closestT) { closestT = t; closest = enemy; }
             }
             if (closest) {
                 closest.hp--;
-                const pos = {x:closest.x,y:1.35,z:closest.z};
+                const pos = {x:closest.x,y:closest.y,z:closest.z};
                 this.events.push({kind:'hit',id:closest.id,pos});
                 if (closest.hp <= 0) {
                     this.enemies = this.enemies.filter(e=>e.id!==closest!.id);this.kills++;

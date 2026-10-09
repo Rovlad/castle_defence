@@ -10,7 +10,7 @@ The committed build is served at `/castle_defence/3d/` on GitHub Pages once merg
 
 - Desktop: drag the mouse or hold arrow keys to aim; click or hold Space to fire.
 - Touch: drag the battlefield to aim, hold left/right buttons to rotate, and tap or hold FIRE. Aim and fire support simultaneous pointers.
-- Each wave must finish spawning and every enemy must be killed or breach before it clears. Start with three castle health and three in-flight bullet slots. Armored enemies from wave 3 take two hits; heavies from wave 5 take three.
+- Each wave must finish spawning and every target must be shot down or breach before it clears. Start with three castle health and three in-flight bullet slots. Targets are low-flying drones with spinning rotors, gentle altitude changes and engine glow: scouts take one hit, armored drones from wave 3 take two, and six-rotor heavies from wave 5 take three. Flight heights range from about 2.8 to 4 metres, below the turret. Aim at the drone body; hits and impacts follow its actual altitude. Nearby engine sounds pan toward approaching targets.
 - Clear a wave to repair one health and choose one upgrade: searchlight width, rotation speed or ammunition. After four seconds, explicitly start the next wave. A new run resets upgrades.
 - Settings pauses play and contains sound, a test chime, sensitivity and graphics quality. Hidden tabs pause simulation. Sound starts after a gesture and attempts the playback audio session on supported iOS versions. Actual iPhone audio output still needs a device test.
 - The bottom HUD shows resolved enemies, remaining enemies and elapsed wave time. Best results stay on the opening screen and are local to this browser.
