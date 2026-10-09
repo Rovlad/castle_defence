@@ -191,7 +191,7 @@ try{
     arena=new Arena(canvas);
     el<HTMLButtonElement>('startBtn').disabled=false;el('startBtn').textContent='Take your position';
     const render=()=>{
-        const now=performance.now(),dt=Math.min(.05,(now-lastTime)/1000);lastTime=now;
+        const now=performance.now(),elapsed=Math.max(0,(now-lastTime)/1000),dt=Math.min(.05,elapsed);lastTime=now;
         if(!document.hidden&&!settings.open){
             if(game.phase==='combat'){
                 const smooth=touchAim.take(dt);game.aim(smooth.x,smooth.y);
@@ -201,7 +201,7 @@ try{
                 const nearest=game.enemies.reduce<{x:number;z:number;d:number}|null>((best,e)=>{const d=Math.hypot(e.x,e.z);return !best||d<best.d?{x:e.x,z:e.z,d}:best;},null);
                 if(nearest&&nearest.d<28&&game.elapsed-lastStep>.5){audio.effect('engine',Math.sin(Math.atan2(nearest.x,nearest.z)-game.yaw));lastStep=game.elapsed;}
                 const threat=game.threat;if(threat&&game.elapsed-lastWarning>1.4){audio.effect('warning',Math.sin(threat.bearing));lastWarning=game.elapsed;}
-            } else game.tick(dt);
+            } else game.tick(elapsed);
         }
         arena!.update(game,document.hidden||settings.open?0:dt);arena!.render();radar.draw(game);updateHud();
         el('hitFlash').style.opacity=now<hitUntil?'1':'0';el('damageFlash').style.opacity=now<damageUntil?'1':'0';
