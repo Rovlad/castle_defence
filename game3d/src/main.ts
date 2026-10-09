@@ -89,7 +89,7 @@ function updateHud(){
         el('threatArrow').style.transform=`rotate(${threat.bearing*180/Math.PI}deg)`;
     }
     if(game.phase==='resupply'){
-        el('loadout').textContent=`Loadout: ${game.damage} damage · ${game.projectileSpeed}m/s rounds · ${game.capacity} slots${game.blastRadius?' · explosive shells':''}${game.jammerOwned?' · radar jammer':''}`;
+        el('loadout').textContent=`Loadout: ${game.damage} damage · ${game.projectileSpeed}m/s rounds · ${game.capacity} slots · light ${1+game.brightnessLevel*.5}×${game.blastRadius?' · explosive shells':''}${game.jammerOwned?' · radar jammer':''}`;
         const wait=Math.max(0,Math.ceil(4-game.resupplyElapsed));
         el<HTMLButtonElement>('nextBtn').disabled=game.paused||wait>0;
         el('resupplyStatus').textContent=wait>0?`Resupply: ${wait}s · Buy upgrades or save your points`:'Ready when you are. Purchases are optional.';

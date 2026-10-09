@@ -33,7 +33,7 @@ Normal wave size is `min(23, 5 + 2 * (wave - 1))`. Difficulty multiplies that si
 
 Normal speed starts at 2.8m/s and increases 0.2m/s per wave before enemy-type modifiers. The first spawn takes 2.5s; subsequent intervals are `max(0.9, 2.8 - 0.12 * (wave - 1))` seconds before difficulty scaling. Health remains three in every mode.
 
-Upgrade prices per purchase: searchlight 30, turret 40, ammo slot 50, bullet speed 60, damage 100, jammer 120, explosive shells 150. Existing upgrade caps still apply. Points carry between waves but not between runs; spending never changes the total points earned shown at defeat. Breaches award no kill points.
+Upgrade prices per purchase: searchlight width 30, searchlight brightness 40, turret 40, ammo slot 50, bullet speed 60, damage 100, jammer 120, explosive shells 150. Brightness adds 50% of the starting light output per purchase, up to three levels (2.5× total), independently of beam width. Existing upgrade caps still apply. Points carry between waves but not between runs; spending never changes the total points earned shown at defeat. Breaches award no kill points.
 
 Use the pause button or Escape to freeze combat or resupply. Resume restores the same state; held inputs are cleared. The shop also has a pause button. Settings and hidden tabs still pause simulation. P continues to activate the jammer.
 

@@ -40,7 +40,7 @@ assert(waves.upgrade('beam')&&waves.points===0,'Multiple affordable purchases ar
 advance(waves,4.1);assert(waves.elapsed===elapsed,'Resupply does not inflate combat time');assert(waves.nextWave(),'Next wave after break and choice');
 assert(waves.wave===2&&waves.waveSize===7&&waves.waveElapsed===0&&waves.spawned===0,'Next wave resets counters');
 assert(waves.fire()&&waves.bullets.length===1,'Gun fires immediately in the next wave');
-waves.beam=Math.PI/2;waves.turnSpeed=2.9;waves.capacity=6;waves.damage=3;waves.projectileSpeed=100;waves.blastRadius=4;waves.jammerOwned=true;waves.spawned=waves.waveSize;waves.enemies=[];waves.tick(.025);advance(waves,4.1);
+waves.brightnessLevel=3;waves.beam=Math.PI/2;waves.turnSpeed=2.9;waves.capacity=6;waves.damage=3;waves.projectileSpeed=100;waves.blastRadius=4;waves.jammerOwned=true;waves.spawned=waves.waveSize;waves.enemies=[];waves.tick(.025);advance(waves,4.1);
 assert(waves.nextWave(),'All-maxed upgrades cannot soft-lock continuation');
 const tiers=new Siege(()=>.25);tiers.wave=5;tiers.waveSize=3;tiers.start();
 for(let i=0;i<3;i++){advance(tiers,3);tiers.enemies.forEach(e=>e.speed=0);}
@@ -73,9 +73,9 @@ for(const kind of ['scout','armored','heavy'] as const){
     let previous=46;
     for(let i=0;i<500;i++){closing.tick(.025);if(!closing.enemies.length)break;const d=Math.hypot(closing.enemies[0].x,closing.enemies[0].z);assert(d<previous,'Each flight pattern makes progress toward the castle');previous=d;}
 }
-const upgradeLimits = {beam:11,turn:6,ammo:3,damage:2,velocity:2,blast:1,jammer:1};
-const cappedValues = {beam:Math.PI/2,turn:2.9,ammo:6,damage:3,velocity:100,blast:4,jammer:true};
-const loadoutValue=(g:Siege,kind:typeof UPGRADES[number])=>({beam:g.beam,turn:g.turnSpeed,ammo:g.capacity,damage:g.damage,velocity:g.projectileSpeed,blast:g.blastRadius,jammer:g.jammerOwned})[kind];
+const upgradeLimits = {brightness:3,beam:11,turn:6,ammo:3,damage:2,velocity:2,blast:1,jammer:1};
+const cappedValues = {brightness:3,beam:Math.PI/2,turn:2.9,ammo:6,damage:3,velocity:100,blast:4,jammer:true};
+const loadoutValue=(g:Siege,kind:typeof UPGRADES[number])=>({brightness:g.brightnessLevel,beam:g.beam,turn:g.turnSpeed,ammo:g.capacity,damage:g.damage,velocity:g.projectileSpeed,blast:g.blastRadius,jammer:g.jammerOwned})[kind];
 const clearWave=(g:Siege)=>{g.spawned=g.waveSize;g.enemies=[];g.tick(.025);assert(g.phase==='resupply','Fresh wave clear opens the shop');};
 for(const kind of UPGRADES){
     const upgraded=new Siege();upgraded.points=10000;upgraded.start();clearWave(upgraded);
@@ -117,7 +117,7 @@ assert(jammer.jamRemaining===active&&jammer.jamCooldown===cooldown,'Ability time
 assert(jammer.jamRemaining===0&&jammer.jamCooldown>0,'Slowdown expires before recharge');
 jammer.enemies=[];jammer.waveSize=1000;advance(jammer,14);assert(jammer.jamCooldown===0&&jammer.pulse(),'Jammer recharges on combat time');
 assert(new Siege().damage===1&&!new Siege().jammerOwned,'Restart begins with the base loadout');
-console.log('PASS: stationary combat, swept hits, flying patterns, damage feedback, touch smoothing, aim assistance, directional warnings, waves, all seven upgrades, splash damage and jammer timing.');
+console.log('PASS: stationary combat, swept hits, flying patterns, damage feedback, touch smoothing, aim assistance, directional warnings, waves, all eight upgrades, splash damage and jammer timing.');
 const slowResupply=new Siege();slowResupply.start();slowResupply.spawned=slowResupply.waveSize;slowResupply.tick(.025);
 slowResupply.points=50;assert(slowResupply.upgrade('ammo'),'Slow-frame resupply permits an upgrade');
 slowResupply.tick(2);assert(!slowResupply.nextWave(),'Four seconds are still required');
@@ -172,3 +172,15 @@ preferences.delete('night-siege-3d-best-normal');preferences.set('night-siege-3d
 assert(loadDifficultyPreferences(storage,'normal')?.wave===3,'Legacy score remains available in Normal');
 assert(loadDifficultyPreferences(storage,'suicide')===null,'Legacy Normal scores do not leak into other difficulties');
 console.log('PASS: independent difficulty persistence, corrupted scores, denied storage and legacy score isolation.');
+
+const light=new Siege();light.start();clearWave(light);light.points=39;
+assert(!light.upgrade('brightness')&&light.brightnessLevel===0&&light.points===39,'Unaffordable brightness preserves balance and level');
+light.points=120;const initialBeam=light.beam;
+for(let level=1;level<=3;level++){
+    assert(light.upgrade('brightness'),'Brightness level can be purchased');
+    assert(Math.abs(light.searchlightIntensity-4.6*(1+level*.5))<1e-9&&light.beam===initialBeam,'Brightness raises light output without widening the beam');
+}
+assert(!light.upgrade('brightness')&&light.points===0,'Brightness is capped at three paid levels');
+light.tick(4);light.nextWave();assert(light.brightnessLevel===3,'Brightness persists across waves');
+assert(new Siege().brightnessLevel===0&&new Siege().searchlightIntensity===4.6,'New run restores starting brightness');
+console.log('PASS: brightness purchases, intensity levels, cap, wave persistence and reset.');
