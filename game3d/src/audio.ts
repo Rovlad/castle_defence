@@ -42,6 +42,8 @@ export class GameAudio {
         else if(kind==='hit')this.tone(550,.12,.14,'square',pan,180);
         else if(kind==='breach')this.tone(130,.5,.28,'sawtooth',0,35);
         else if(kind==='engine')this.tone(110,.18,.12,'triangle',pan,95);
+        else if(kind==='warning')this.tone(920,.08,.10,'triangle',pan,720);
+        else if(kind==='explosion')this.tone(85,.35,.32,'sawtooth',pan,25);
         else {this.tone(440,.28,.16,'sine');this.tone(660,.4,.13,'sine');}
     }
     suspend(){void this.context?.suspend().catch(()=>{});}

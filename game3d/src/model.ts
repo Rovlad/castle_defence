@@ -1,16 +1,23 @@
 export type V3 = { x: number; y: number; z: number };
 export type Phase = 'ready' | 'combat' | 'resupply' | 'lost';
-export type Upgrade = 'beam' | 'turn' | 'ammo';
-export type Enemy = { id: number; x: number; y: number; z: number; hp: number; maxHp: number; radius: number; speed: number; kind: 'scout' | 'armored' | 'heavy'; reveal: number; age: number };
-export type Bullet = { id: number; pos: V3; direction: V3; age: number };
-export type GameEvent = { kind: 'spawn' | 'shot' | 'hit' | 'kill' | 'breach' | 'clear' | 'lost'; id?: number; pos?: V3 };
+export const UPGRADES = ['beam','turn','ammo','damage','velocity','blast','jammer'] as const;
+export type Upgrade = typeof UPGRADES[number];
+export type Enemy = { id: number; x: number; y: number; z: number; hp: number; maxHp: number; radius: number; speed: number; kind: 'scout' | 'armored' | 'heavy'; reveal: number; age: number; hitFlash?: number };
+export type Bullet = { id: number; pos: V3; direction: V3; age: number; speed: number; damage: number; blast: number };
+export type GameEvent = { kind: 'spawn' | 'shot' | 'hit' | 'kill' | 'breach' | 'clear' | 'lost' | 'pulse' | 'blast'; id?: number; pos?: V3; hp?: number; targetKind?: Enemy['kind'] };
 export const STATION: Readonly<V3> = Object.freeze({ x: 0, y: 5.8, z: 0 });
 export const SPAWN_RADIUS = 46;
 export const BREACH_RADIUS = 8;
 export const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
+export const wrapAngle = (angle: number) => ((angle + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
 export function flightHeight(kind: Enemy['kind'], age: number, id: number) {
     const altitude = kind === 'heavy' ? 3.8 : kind === 'armored' ? 3.3 : 3;
-    return altitude + Math.sin(age * 1.8 + id * .7) * .24;
+    const frequency = kind === 'scout' ? 1.8 : kind === 'armored' ? .65 : .9;
+    return altitude + Math.sin(age * frequency + id * .7) * (kind === 'armored' ? .1 : .24);
+}
+export function flightMotion(kind: Enemy['kind'], age: number, wave: number) {
+    return { drift: kind === 'scout' && wave > 1 ? Math.sin(age*2.1)*.65 : 0,
+        pace: kind === 'heavy' && age%6 > 4 ? 1.3 : 1 };
 }
 export function aimDirection(yaw: number, pitch: number): V3 {
     return { x: Math.sin(yaw) * Math.cos(pitch), y: -Math.sin(pitch), z: Math.cos(yaw) * Math.cos(pitch) };
@@ -33,6 +40,7 @@ export class Siege {
     phase: Phase = 'ready';
     wave = 1; health = 3; kills = 0; waveSize = 5; spawned = 0;
     yaw = 0; pitch = Math.atan2(STATION.y-3,SPAWN_RADIUS); beam = Math.PI/5; turnSpeed = 1.4; capacity = 3;
+    damage = 1; projectileSpeed = 62; blastRadius = 0; jammerOwned = false; jamRemaining = 0; jamCooldown = 0;
     elapsed = 0; waveElapsed = 0; spawnElapsed = 0; resupplyElapsed = 0; cooldown = 0;
     chosen: Upgrade | 'max' | null = null;
     enemies: Enemy[] = []; bullets: Bullet[] = []; events: GameEvent[] = [];
@@ -43,28 +51,76 @@ export class Siege {
     get resolved() { return this.spawned-this.enemies.length; }
     get spawnDelay() { return this.spawned === 0 ? 2.5 : Math.max(.9,2.8-(this.wave-1)*.12); }
     get nextArrival() { return this.spawned < this.waveSize ? Math.max(0,this.spawnDelay-this.spawnElapsed) : null; }
+    get threat() {
+        if (this.phase !== 'combat') return null;
+        let result: { enemy: Enemy; bearing: number; eta: number } | null = null;
+        for (const enemy of this.enemies) {
+            const distance = Math.hypot(enemy.x,enemy.z);
+            if (distance > 24) continue;
+            const pace=flightMotion(enemy.kind,enemy.age,this.wave).pace;
+            const eta = Math.max(0,distance-BREACH_RADIUS)/Math.max(.2,enemy.speed*pace*(this.jamRemaining>0?.45:1));
+            if (!result || eta < result.eta) result = {enemy,eta,bearing:wrapAngle(Math.atan2(enemy.x,enemy.z)-this.yaw)};
+        }
+        return result;
+    }
     start() { if (this.phase === 'ready') this.phase = 'combat'; }
     aim(dx: number, dy: number) {
-        this.yaw = (this.yaw+dx+Math.PI*3)%(Math.PI*2)-Math.PI;
+        this.yaw = wrapAngle(this.yaw+dx);
         this.pitch = clamp(this.pitch+dy,-.28,.60);
+    }
+    assistAim(dt: number) {
+        if (this.phase !== 'combat') return;
+        const direction = aimDirection(this.yaw,this.pitch);
+        let target: Enemy | null = null, best = Math.cos(Math.PI / 45);
+        for (const enemy of this.enemies) {
+            if (enemy.reveal < .5) continue;
+            const y = enemy.y-STATION.y, distance = Math.hypot(enemy.x,y,enemy.z);
+            const dot = (enemy.x*direction.x+y*direction.y+enemy.z*direction.z)/distance;
+            if (dot > best && dot >= Math.cos(this.beam/2)) { best = dot; target = enemy; }
+        }
+        if (!target) return;
+        const yaw = wrapAngle(Math.atan2(target.x,target.z)-this.yaw);
+        const pitch = Math.atan2(STATION.y-target.y,Math.hypot(target.x,target.z))-this.pitch;
+        const amount = Math.min(1,Math.max(0,dt)*3), limit = Math.max(0,dt)*.12;
+        this.aim(clamp(yaw*amount,-limit,limit),clamp(pitch*amount,-limit,limit));
     }
     fire(): boolean {
         if (this.phase !== 'combat' || this.cooldown > 0 || this.bullets.length >= this.capacity) return false;
         const direction = aimDirection(this.yaw,this.pitch);
         const pos = { x: STATION.x+direction.x*.9, y:STATION.y+direction.y*.9, z:STATION.z+direction.z*.9 };
-        const bullet = { id:++this.nextId, pos, direction, age:0 };
+        const bullet = { id:++this.nextId, pos, direction, age:0, speed:this.projectileSpeed, damage:this.damage, blast:this.blastRadius };
         this.bullets.push(bullet); this.cooldown = .14;
         this.events.push({kind:'shot',pos}); return true;
     }
     canUpgrade(kind: Upgrade) {
-        return kind === 'beam' ? this.beam < Math.PI/2-.001 : kind === 'turn' ? this.turnSpeed < 2.9-.001 : this.capacity < 6;
+        return kind === 'beam' ? this.beam < Math.PI/2-.001 : kind === 'turn' ? this.turnSpeed < 2.9-.001 :
+            kind === 'ammo' ? this.capacity < 6 : kind === 'damage' ? this.damage < 3 :
+            kind === 'velocity' ? this.projectileSpeed < 100 : kind === 'blast' ? this.blastRadius === 0 :
+            kind === 'jammer' ? !this.jammerOwned : false;
     }
     upgrade(kind: Upgrade) {
         if (this.phase !== 'resupply' || this.chosen || !this.canUpgrade(kind)) return false;
         if (kind === 'beam') this.beam = Math.min(Math.PI/2,this.beam+Math.PI/36);
         if (kind === 'turn') this.turnSpeed = Math.min(2.9,this.turnSpeed+.25);
         if (kind === 'ammo') this.capacity++;
+        if (kind === 'damage') this.damage++;
+        if (kind === 'velocity') this.projectileSpeed=Math.min(100,this.projectileSpeed+19);
+        if (kind === 'blast') this.blastRadius=4;
+        if (kind === 'jammer') this.jammerOwned=true;
         this.chosen = kind; return true;
+    }
+    pulse() {
+        if(this.phase!=='combat'||!this.jammerOwned||this.jamCooldown>0)return false;
+        this.jamRemaining=4;this.jamCooldown=18;this.events.push({kind:'pulse'});return true;
+    }
+    private damageEnemy(enemy:Enemy,amount:number) {
+        enemy.hp=Math.max(0,enemy.hp-amount);enemy.hitFlash=.16;
+        const pos={x:enemy.x,y:enemy.y,z:enemy.z};
+        this.events.push({kind:'hit',id:enemy.id,pos,hp:enemy.hp,targetKind:enemy.kind});
+        if(enemy.hp===0){
+            this.enemies=this.enemies.filter(e=>e.id!==enemy.id);this.kills++;
+            this.events.push({kind:'kill',id:enemy.id,pos,targetKind:enemy.kind});
+        }
     }
     nextWave() {
         if (this.phase !== 'resupply' || !this.chosen || this.resupplyElapsed < 4) return false;
@@ -78,6 +134,7 @@ export class Siege {
         if (this.phase !== 'combat') return;
         this.elapsed += dt; this.waveElapsed += dt; this.spawnElapsed += dt;
         this.cooldown = Math.max(0,this.cooldown-dt);
+        this.jamRemaining=Math.max(0,this.jamRemaining-dt);this.jamCooldown=Math.max(0,this.jamCooldown-dt);
         if (this.spawned < this.waveSize && this.spawnElapsed >= this.spawnDelay) {
             const angle = this.wave === 1 && this.spawned === 0 ? this.yaw : this.random()*Math.PI*2;
             const number = ++this.spawned;
@@ -92,6 +149,7 @@ export class Siege {
         const aim = aimDirection(this.yaw,this.pitch);
         for (const enemy of [...this.enemies]) {
             enemy.age += dt;
+            enemy.hitFlash = Math.max(0,(enemy.hitFlash||0)-dt);
             enemy.y = flightHeight(enemy.kind,enemy.age,enemy.id);
             const d = Math.hypot(enemy.x,enemy.z);
             if (d <= BREACH_RADIUS) {
@@ -100,10 +158,11 @@ export class Siege {
                 if (this.health <= 0) { this.health = 0;this.phase = 'lost';this.bullets = [];this.events.push({kind:'lost'});return; }
                 continue;
             }
-            const drift = this.wave >= 3 ? Math.sin(enemy.age*1.3)*.24 : 0;
+            const {drift,pace} = flightMotion(enemy.kind,enemy.age,this.wave);
             const ux = enemy.x/d, uz = enemy.z/d;
-            enemy.x += (-ux-uz*drift)*enemy.speed*dt;
-            enemy.z += (-uz+ux*drift)*enemy.speed*dt;
+            const slow=this.jamRemaining>0?.45:1;
+            enemy.x += (-ux-uz*drift)*enemy.speed*pace*slow*dt;
+            enemy.z += (-uz+ux*drift)*enemy.speed*pace*slow*dt;
             const ey = enemy.y-STATION.y, distance = Math.hypot(enemy.x,ey,enemy.z);
             const dot = (enemy.x*aim.x+ey*aim.y+enemy.z*aim.z)/distance;
             enemy.reveal = dot >= Math.cos(this.beam/2) ? 1 : Math.max(0,enemy.reveal-dt/.4);
@@ -112,19 +171,19 @@ export class Siege {
         for (const bullet of this.bullets) {
             const old = { ...bullet.pos };
             bullet.age += dt;
-            bullet.pos = { x:old.x+bullet.direction.x*62*dt, y:old.y+bullet.direction.y*62*dt, z:old.z+bullet.direction.z*62*dt };
+            bullet.pos = { x:old.x+bullet.direction.x*bullet.speed*dt, y:old.y+bullet.direction.y*bullet.speed*dt, z:old.z+bullet.direction.z*bullet.speed*dt };
             let closest: Enemy | null = null, closestT = Infinity;
             for (const enemy of this.enemies) {
                 const t = segmentHit(old,bullet.pos,{x:enemy.x,y:enemy.y,z:enemy.z},enemy.radius+.12);
                 if (t !== null && t < closestT) { closestT = t; closest = enemy; }
             }
             if (closest) {
-                closest.hp--;
                 const pos = {x:closest.x,y:closest.y,z:closest.z};
-                this.events.push({kind:'hit',id:closest.id,pos});
-                if (closest.hp <= 0) {
-                    this.enemies = this.enemies.filter(e=>e.id!==closest!.id);this.kills++;
-                    this.events.push({kind:'kill',id:closest.id,pos});
+                this.damageEnemy(closest,bullet.damage);
+                if(bullet.blast>0){
+                    this.events.push({kind:'blast',pos});
+                    for(const enemy of [...this.enemies])if(enemy.id!==closest.id&&Math.hypot(enemy.x-pos.x,enemy.y-pos.y,enemy.z-pos.z)<=bullet.blast)
+                        this.damageEnemy(enemy,1);
                 }
             } else if (bullet.age < 1.3 && bullet.pos.y > 0) liveBullets.push(bullet);
         }
@@ -132,7 +191,7 @@ export class Siege {
         if (this.spawned === this.waveSize && this.enemies.length === 0) {
             this.phase = 'resupply';this.health = Math.min(3,this.health+1);
             this.bullets = [];this.resupplyElapsed = 0;this.chosen = null;
-            if (!(['beam','turn','ammo'] as Upgrade[]).some(kind=>this.canUpgrade(kind))) this.chosen = 'max';
+            if (!UPGRADES.some(kind=>this.canUpgrade(kind))) this.chosen = 'max';
             this.events.push({kind:'clear'});
         }
     }
