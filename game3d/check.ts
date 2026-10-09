@@ -1,7 +1,8 @@
-import { Siege, STATION, segmentHit, aimDirection, flightHeight, flightMotion, UPGRADES, type Enemy } from './src/model.ts';
+import { Siege, STATION, SPAWN_RADIUS, DIFFICULTIES, UPGRADE_COSTS, KILL_POINTS, WAVE_BONUS, segmentHit, aimDirection, flightHeight, flightMotion, UPGRADES, type Enemy } from './src/model.ts';
 import { radarPoint, radarSector } from './src/radar.ts';
 import { AimSmoother } from './src/controls.ts';
 import { targetFeedback } from './src/feedback.ts';
+import { loadDifficultyPreferences } from './src/preferences.ts';
 function assert(condition:unknown,message:string) {if(!condition)throw Error(message);}
 const advance=(g:Siege,seconds:number)=>{for(let i=0;i<Math.ceil(seconds/.025);i++)g.tick(.025);};
 assert(segmentHit({x:0,y:0,z:0},{x:10,y:0,z:0},{x:5,y:0,z:0},1)===.4,'Swept bullet hits between frames');
@@ -31,18 +32,21 @@ const frozen=breaches.elapsed;advance(breaches,10);assert(breaches.elapsed===fro
 const waves=new Siege();waves.start();waves.health=2;waves.spawned=waves.waveSize;waves.enemies=[target(50)];waves.tick(.025);
 assert(waves.phase==='combat','Surviving enemies prevent wave completion');waves.enemies=[];waves.tick(.025);
 assert(waves.phase==='resupply'&&waves.health===3,'Clearing repairs and enters resupply');
-const elapsed=waves.elapsed;assert(!waves.fire(),'No firing during resupply');assert(!waves.nextWave(),'Choice and rest are required');
-assert(waves.upgrade('ammo')&&waves.capacity===4,'Ammo upgrade works');assert(!waves.upgrade('beam'),'Only one upgrade per break');
+const elapsed=waves.elapsed;assert(!waves.fire(),'No firing during resupply');assert(!waves.nextWave(),'Rest is required before continuing');
+assert(waves.points===WAVE_BONUS,'Wave clear awards points once');
+assert(!waves.upgrade('ammo')&&waves.capacity===3&&waves.points===WAVE_BONUS,'Unaffordable upgrade changes neither points nor loadout');
+waves.points=80;assert(waves.upgrade('ammo')&&waves.capacity===4&&waves.points===30,'Purchase deducts its price');
+assert(waves.upgrade('beam')&&waves.points===0,'Multiple affordable purchases are allowed in a break');
 advance(waves,4.1);assert(waves.elapsed===elapsed,'Resupply does not inflate combat time');assert(waves.nextWave(),'Next wave after break and choice');
 assert(waves.wave===2&&waves.waveSize===7&&waves.waveElapsed===0&&waves.spawned===0,'Next wave resets counters');
 assert(waves.fire()&&waves.bullets.length===1,'Gun fires immediately in the next wave');
 waves.beam=Math.PI/2;waves.turnSpeed=2.9;waves.capacity=6;waves.damage=3;waves.projectileSpeed=100;waves.blastRadius=4;waves.jammerOwned=true;waves.spawned=waves.waveSize;waves.enemies=[];waves.tick(.025);advance(waves,4.1);
-assert(waves.chosen==='max'&&waves.nextWave(),'All-maxed upgrades cannot soft-lock continuation');
+assert(waves.nextWave(),'All-maxed upgrades cannot soft-lock continuation');
 const tiers=new Siege(()=>.25);tiers.wave=5;tiers.waveSize=3;tiers.start();
 for(let i=0;i<3;i++){advance(tiers,3);tiers.enemies.forEach(e=>e.speed=0);}
 assert(tiers.enemies.some(e=>e.kind==='armored')&&tiers.enemies.some(e=>e.kind==='heavy'),'Later waves include both armor tiers');
 const direction=aimDirection(Math.PI/2,0);assert(Math.abs(direction.x-1)<1e-8,'Yaw points east');
-const north=radarPoint(0,46),east=radarPoint(46,0),south=radarPoint(0,-46),west=radarPoint(-46,0);
+const north=radarPoint(0,SPAWN_RADIUS),east=radarPoint(SPAWN_RADIUS,0),south=radarPoint(0,-SPAWN_RADIUS),west=radarPoint(-SPAWN_RADIUS,0);
 assert(north.x===80&&north.y<80&&east.x>80&&east.y===80&&south.y>80&&west.x<80,'Radar cardinal directions match world coordinates');
 assert(radarPoint(0,0).x===80&&radarPoint(0,0).y===80,'Castle stays at radar centre');
 assert(Math.abs(radarPoint(0,20).y-80)<Math.abs(north.y-80),'Approaching targets move inward');
@@ -72,19 +76,18 @@ for(const kind of ['scout','armored','heavy'] as const){
 const upgradeLimits = {beam:11,turn:6,ammo:3,damage:2,velocity:2,blast:1,jammer:1};
 const cappedValues = {beam:Math.PI/2,turn:2.9,ammo:6,damage:3,velocity:100,blast:4,jammer:true};
 const loadoutValue=(g:Siege,kind:typeof UPGRADES[number])=>({beam:g.beam,turn:g.turnSpeed,ammo:g.capacity,damage:g.damage,velocity:g.projectileSpeed,blast:g.blastRadius,jammer:g.jammerOwned})[kind];
-const clearWave=(g:Siege)=>{g.spawned=g.waveSize;g.enemies=[];g.tick(.025);assert(g.phase==='resupply'&&g.chosen===null,'Fresh wave clear permits a new selection');};
+const clearWave=(g:Siege)=>{g.spawned=g.waveSize;g.enemies=[];g.tick(.025);assert(g.phase==='resupply','Fresh wave clear opens the shop');};
 for(const kind of UPGRADES){
-    const upgraded=new Siege();upgraded.start();clearWave(upgraded);
+    const upgraded=new Siege();upgraded.points=10000;upgraded.start();clearWave(upgraded);
     for(let count=0;count<upgradeLimits[kind];count++){
         assert(upgraded.canUpgrade(kind),`${kind} remains available below its cap`);
-        assert(upgraded.upgrade(kind)&&upgraded.chosen===kind,`${kind} upgrade equips`);
-        assert(!upgraded.upgrade(kind),'Upgrade cannot be selected twice in one break');
+        const balance=upgraded.points;assert(upgraded.upgrade(kind)&&upgraded.points===balance-UPGRADE_COSTS[kind],`${kind} upgrade equips at its price`);
         advance(upgraded,4.1);assert(upgraded.nextWave(),'Each upgrade gets a fresh resupply selection');clearWave(upgraded);
     }
     const value=loadoutValue(upgraded,kind),expected=cappedValues[kind];
     assert(typeof value==='number'&&typeof expected==='number'?Math.abs(value-expected)<1e-9:value===expected,`${kind} reaches its expected cap`);
     assert(!upgraded.canUpgrade(kind)&&!upgraded.upgrade(kind),`${kind} rejects another selection in a fresh break at its cap`);
-    assert(upgraded.chosen===null&&loadoutValue(upgraded,kind)===value,`${kind} cap rejection preserves loadout and selection`);
+    assert(loadoutValue(upgraded,kind)===value,`${kind} cap rejection preserves loadout`);
 }
 const strong=new Siege();strong.start();strong.damage=3;strong.enemies=[target(100,3)];strong.pitch=combat.pitch;strong.fire();advance(strong,.4);
 assert(strong.kills===1,'Stronger shot destroys three-hit armor');
@@ -116,9 +119,56 @@ jammer.enemies=[];jammer.waveSize=1000;advance(jammer,14);assert(jammer.jamCoold
 assert(new Siege().damage===1&&!new Siege().jammerOwned,'Restart begins with the base loadout');
 console.log('PASS: stationary combat, swept hits, flying patterns, damage feedback, touch smoothing, aim assistance, directional warnings, waves, all seven upgrades, splash damage and jammer timing.');
 const slowResupply=new Siege();slowResupply.start();slowResupply.spawned=slowResupply.waveSize;slowResupply.tick(.025);
-assert(slowResupply.upgrade('ammo'),'Slow-frame resupply permits an upgrade');
+slowResupply.points=50;assert(slowResupply.upgrade('ammo'),'Slow-frame resupply permits an upgrade');
 slowResupply.tick(2);assert(!slowResupply.nextWave(),'Four seconds are still required');
 slowResupply.tick(2);assert(slowResupply.nextWave(),'Resupply completes after four elapsed seconds even at low frame rates');
 const combatElapsed=slowResupply.elapsed;slowResupply.tick(2);
 assert(Math.abs(slowResupply.elapsed-combatElapsed-.05)<1e-8,'Long combat frames remain capped');
 console.log('PASS: low-frame-rate resupply readiness and combat time cap.');
+
+assert(SPAWN_RADIUS===65&&Math.abs(Math.hypot(g.enemies[0].x,g.enemies[0].z)-SPAWN_RADIUS)<1,'Drones spawn at the extended edge');
+const skipShop=new Siege();skipShop.start();clearWave(skipShop);skipShop.tick(4);
+assert(skipShop.nextWave()&&skipShop.points===WAVE_BONUS,'Player can save points and continue without buying');
+const outsideShop=new Siege();outsideShop.points=1000;
+assert(!outsideShop.upgrade('beam'),'Cannot purchase before playing');outsideShop.start();assert(!outsideShop.upgrade('beam'),'Cannot purchase during combat');
+for(const kind of ['scout','armored','heavy'] as const){
+    const rewards=new Siege();rewards.start();rewards.enemies=[{...target(100),kind}];rewards.pitch=combat.pitch;rewards.fire();advance(rewards,.4);
+    assert(rewards.points===KILL_POINTS[kind]&&rewards.earnedPoints===KILL_POINTS[kind],'Each drone tier awards its points only when destroyed');
+    advance(rewards,.4);assert(rewards.points===KILL_POINTS[kind],'Dead targets do not award points twice');
+}
+assert(explosive.points===20&&explosive.earnedPoints===20,'Splash kills also award points');
+const noReward=new Siege();noReward.start();noReward.enemies=[target(1,1,0,7)];noReward.tick(.025);assert(noReward.points===0,'Breaches award no kill points');
+const pause=new Siege();pause.start();pause.jammerOwned=true;pause.pulse();pause.fire();advance(pause,2.6);
+assert(pause.setPaused(true),'Combat can pause');
+const pausedState=JSON.stringify(pause);pause.tick(10);assert(JSON.stringify(pause)===pausedState&&!pause.fire()&&!pause.pulse(),'Pause freezes enemies, bullets, combat, spawns and jammer timers and blocks actions');
+pause.setPaused(false);pause.tick(.025);assert(pause.elapsed>JSON.parse(pausedState).elapsed,'Resume advances combat again');
+clearWave(pause);pause.setPaused(true);const restTime=pause.resupplyElapsed,balance=pause.points;
+assert(!pause.upgrade('beam')&&!pause.nextWave(),'Paused shop blocks purchases and continuation');pause.tick(10);
+assert(pause.resupplyElapsed===restTime&&pause.points===balance,'Pause freezes resupply time and points');pause.setPaused(false);pause.tick(4);assert(pause.nextWave(),'Resume allows resupply to finish');
+let previousSize=0,previousSpeed=0,previousDelay=Infinity;
+for(const difficulty of Object.keys(DIFFICULTIES) as (keyof typeof DIFFICULTIES)[]){
+    const mode=new Siege(()=>.25,difficulty);mode.start();advance(mode,mode.spawnDelay+.1);
+    assert(mode.waveSize>previousSize&&mode.enemies[0].speed>previousSpeed&&mode.spawnDelay<previousDelay,'Difficulty progressively increases count/speed and reduces spawn interval');
+    previousSize=mode.waveSize;previousSpeed=mode.enemies[0].speed;previousDelay=mode.spawnDelay;
+    mode.wave=10;mode.spawned=mode.waveSize;mode.enemies=[];mode.tick(.025);mode.tick(4);mode.nextWave();
+    assert(mode.waveSize===Math.round(23*mode.rules.enemies),'Difficulty scales later capped waves');
+}
+const fresh=new Siege(Math.random,'hard');assert(fresh.points===0&&fresh.earnedPoints===0&&!fresh.paused&&fresh.difficulty==='hard','New run resets economy, pause and upgrades while using selected difficulty');
+console.log('PASS: extended arena, purchases, savings, kill and wave rewards, splash rewards, pause/resume and four difficulties.');
+const preferences=new Map<string,string>([['night-siege-3d-best-hard','{broken'],['night-siege-3d-difficulty','normal']]);
+const storage={getItem:(key:string)=>preferences.get(key)??null,setItem:(key:string,value:string)=>{preferences.set(key,value);}};
+assert(loadDifficultyPreferences(storage,'hard')===null,'Malformed score is ignored');
+assert(preferences.get('night-siege-3d-difficulty')==='hard','Malformed score does not prevent remembering Hard');
+const remembered=preferences.get('night-siege-3d-difficulty') as 'hard';
+loadDifficultyPreferences(storage,remembered);
+assert(preferences.get('night-siege-3d-difficulty')==='hard','Remembered selection survives loading preferences again');
+const validScore={wave:3,kills:12,time:40};preferences.set('night-siege-3d-best-normal',JSON.stringify(validScore));
+assert(loadDifficultyPreferences(storage,'normal')?.kills===12,'Valid scores still load');
+assert(loadDifficultyPreferences({...storage,setItem(){throw Error('Write denied');}},'normal')?.wave===3,'Failed difficulty write does not discard a valid score');
+loadDifficultyPreferences({...storage,getItem(){throw Error('Read denied');}},'easy');
+assert(preferences.get('night-siege-3d-difficulty')==='easy','Failed score read does not block independent difficulty write');
+assert(loadDifficultyPreferences({getItem(){throw Error('Denied');},setItem(){throw Error('Denied');}},'hard')===null,'Unavailable storage does not prevent play');
+preferences.delete('night-siege-3d-best-normal');preferences.set('night-siege-3d-best',JSON.stringify(validScore));
+assert(loadDifficultyPreferences(storage,'normal')?.wave===3,'Legacy score remains available in Normal');
+assert(loadDifficultyPreferences(storage,'suicide')===null,'Legacy Normal scores do not leak into other difficulties');
+console.log('PASS: independent difficulty persistence, corrupted scores, denied storage and legacy score isolation.');

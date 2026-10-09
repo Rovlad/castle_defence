@@ -50,7 +50,7 @@ export class Arena {
         const moonlight = new DirectionalLight('moonlight',new Vector3(.35,-1,.5),this.scene);moonlight.intensity = .25;
         moonlight.diffuse = new Color3(.47,.61,.83);
         this.spotlight = new SpotLight('searchlight',this.camera.position.clone(),new Vector3(0,-.1,1),Math.PI/5,3,this.scene);
-        this.spotlight.diffuse = new Color3(1,.91,.72);this.spotlight.intensity = 2.3;this.spotlight.range = 80;
+        this.spotlight.diffuse = new Color3(1,.91,.72);this.spotlight.intensity = 2.3;this.spotlight.range = 100;
         const beamTexture=new DynamicTexture('soft searchlight',{width:128,height:128},this.scene,false);
         const beamContext=beamTexture.getContext();
         const gradient=beamContext.createRadialGradient(64,64,24,64,64,64);

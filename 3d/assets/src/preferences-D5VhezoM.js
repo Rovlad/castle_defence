@@ -1,0 +1,1 @@
+function s(t,i){let n=null;try{const e=JSON.parse(t.getItem(`night-siege-3d-best-${i}`)||(i==="normal"?t.getItem("night-siege-3d-best"):null)||"null");e&&Number.isInteger(e.wave)&&e.wave>0&&Number.isInteger(e.kills)&&e.kills>=0&&Number.isFinite(e.time)&&e.time>=0&&(n=e)}catch{}try{t.setItem("night-siege-3d-difficulty",i)}catch{}return n}export{s as loadDifficultyPreferences};
