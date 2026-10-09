@@ -129,8 +129,9 @@ export class Siege {
         this.phase = 'combat'; this.chosen = null; return true;
     }
     tick(dt: number) {
+        // Resupply measures elapsed time, not capped combat simulation steps.
+        if (this.phase === 'resupply') { this.resupplyElapsed += Math.max(0,dt); return; }
         dt = clamp(dt,0,.05);
-        if (this.phase === 'resupply') { this.resupplyElapsed += dt; return; }
         if (this.phase !== 'combat') return;
         this.elapsed += dt; this.waveElapsed += dt; this.spawnElapsed += dt;
         this.cooldown = Math.max(0,this.cooldown-dt);

@@ -115,3 +115,10 @@ assert(jammer.jamRemaining===0&&jammer.jamCooldown>0,'Slowdown expires before re
 jammer.enemies=[];jammer.waveSize=1000;advance(jammer,14);assert(jammer.jamCooldown===0&&jammer.pulse(),'Jammer recharges on combat time');
 assert(new Siege().damage===1&&!new Siege().jammerOwned,'Restart begins with the base loadout');
 console.log('PASS: stationary combat, swept hits, flying patterns, damage feedback, touch smoothing, aim assistance, directional warnings, waves, all seven upgrades, splash damage and jammer timing.');
+const slowResupply=new Siege();slowResupply.start();slowResupply.spawned=slowResupply.waveSize;slowResupply.tick(.025);
+assert(slowResupply.upgrade('ammo'),'Slow-frame resupply permits an upgrade');
+slowResupply.tick(2);assert(!slowResupply.nextWave(),'Four seconds are still required');
+slowResupply.tick(2);assert(slowResupply.nextWave(),'Resupply completes after four elapsed seconds even at low frame rates');
+const combatElapsed=slowResupply.elapsed;slowResupply.tick(2);
+assert(Math.abs(slowResupply.elapsed-combatElapsed-.05)<1e-8,'Long combat frames remain capped');
+console.log('PASS: low-frame-rate resupply readiness and combat time cap.');
