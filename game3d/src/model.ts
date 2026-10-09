@@ -1,4 +1,14 @@
 export type V3 = { x: number; y: number; z: number };
+export const DIFFICULTIES = {
+    easy: { label: 'Easy', speed: .75, interval: 1.2, enemies: .8 },
+    normal: { label: 'Normal', speed: 1, interval: 1, enemies: 1 },
+    hard: { label: 'Hard', speed: 1.25, interval: .85, enemies: 1.2 },
+    suicide: { label: 'Suicide', speed: 1.6, interval: .65, enemies: 1.5 }
+} as const;
+export type Difficulty = keyof typeof DIFFICULTIES;
+export const UPGRADE_COSTS = { beam: 30, turn: 40, ammo: 50, damage: 100, velocity: 60, blast: 150, jammer: 120 } as const;
+export const KILL_POINTS = { scout: 10, armored: 20, heavy: 30 } as const;
+export const WAVE_BONUS = 20;
 export type Phase = 'ready' | 'combat' | 'resupply' | 'lost';
 export const UPGRADES = ['beam','turn','ammo','damage','velocity','blast','jammer'] as const;
 export type Upgrade = typeof UPGRADES[number];
@@ -6,7 +16,7 @@ export type Enemy = { id: number; x: number; y: number; z: number; hp: number; m
 export type Bullet = { id: number; pos: V3; direction: V3; age: number; speed: number; damage: number; blast: number };
 export type GameEvent = { kind: 'spawn' | 'shot' | 'hit' | 'kill' | 'breach' | 'clear' | 'lost' | 'pulse' | 'blast'; id?: number; pos?: V3; hp?: number; targetKind?: Enemy['kind'] };
 export const STATION: Readonly<V3> = Object.freeze({ x: 0, y: 5.8, z: 0 });
-export const SPAWN_RADIUS = 46;
+export const SPAWN_RADIUS = 65;
 export const BREACH_RADIUS = 8;
 export const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
 export const wrapAngle = (angle: number) => ((angle + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
@@ -42,14 +52,24 @@ export class Siege {
     yaw = 0; pitch = Math.atan2(STATION.y-3,SPAWN_RADIUS); beam = Math.PI/5; turnSpeed = 1.4; capacity = 3;
     damage = 1; projectileSpeed = 62; blastRadius = 0; jammerOwned = false; jamRemaining = 0; jamCooldown = 0;
     elapsed = 0; waveElapsed = 0; spawnElapsed = 0; resupplyElapsed = 0; cooldown = 0;
-    chosen: Upgrade | 'max' | null = null;
+    points = 0; earnedPoints = 0; paused = false;
+    readonly difficulty: Difficulty;
     enemies: Enemy[] = []; bullets: Bullet[] = []; events: GameEvent[] = [];
     private nextId = 0;
     private random: () => number;
-    constructor(random: () => number = Math.random) { this.random = random; }
+    constructor(random: () => number = Math.random, difficulty: Difficulty = 'normal') {
+        this.random = random; this.difficulty = difficulty; this.waveSize = this.sizeForWave;
+    }
+    get rules() { return DIFFICULTIES[this.difficulty]; }
+    get sizeForWave() { return Math.max(1,Math.round(Math.min(23,5+(this.wave-1)*2)*this.rules.enemies)); }
+    setPaused(paused: boolean) {
+        if (this.phase !== 'combat' && this.phase !== 'resupply') return false;
+        this.paused = paused; return true;
+    }
+    private award(points: number) { this.points += points; this.earnedPoints += points; }
     get remaining() { return this.waveSize-this.spawned+this.enemies.length; }
     get resolved() { return this.spawned-this.enemies.length; }
-    get spawnDelay() { return this.spawned === 0 ? 2.5 : Math.max(.9,2.8-(this.wave-1)*.12); }
+    get spawnDelay() { return (this.spawned === 0 ? 2.5 : Math.max(.9,2.8-(this.wave-1)*.12))*this.rules.interval; }
     get nextArrival() { return this.spawned < this.waveSize ? Math.max(0,this.spawnDelay-this.spawnElapsed) : null; }
     get threat() {
         if (this.phase !== 'combat') return null;
@@ -69,7 +89,7 @@ export class Siege {
         this.pitch = clamp(this.pitch+dy,-.28,.60);
     }
     assistAim(dt: number) {
-        if (this.phase !== 'combat') return;
+        if (this.paused || this.phase !== 'combat') return;
         const direction = aimDirection(this.yaw,this.pitch);
         let target: Enemy | null = null, best = Math.cos(Math.PI / 45);
         for (const enemy of this.enemies) {
@@ -85,7 +105,7 @@ export class Siege {
         this.aim(clamp(yaw*amount,-limit,limit),clamp(pitch*amount,-limit,limit));
     }
     fire(): boolean {
-        if (this.phase !== 'combat' || this.cooldown > 0 || this.bullets.length >= this.capacity) return false;
+        if (this.paused || this.phase !== 'combat' || this.cooldown > 0 || this.bullets.length >= this.capacity) return false;
         const direction = aimDirection(this.yaw,this.pitch);
         const pos = { x: STATION.x+direction.x*.9, y:STATION.y+direction.y*.9, z:STATION.z+direction.z*.9 };
         const bullet = { id:++this.nextId, pos, direction, age:0, speed:this.projectileSpeed, damage:this.damage, blast:this.blastRadius };
@@ -99,7 +119,7 @@ export class Siege {
             kind === 'jammer' ? !this.jammerOwned : false;
     }
     upgrade(kind: Upgrade) {
-        if (this.phase !== 'resupply' || this.chosen || !this.canUpgrade(kind)) return false;
+        if (this.paused || this.phase !== 'resupply' || !this.canUpgrade(kind) || this.points < UPGRADE_COSTS[kind]) return false;
         if (kind === 'beam') this.beam = Math.min(Math.PI/2,this.beam+Math.PI/36);
         if (kind === 'turn') this.turnSpeed = Math.min(2.9,this.turnSpeed+.25);
         if (kind === 'ammo') this.capacity++;
@@ -107,10 +127,10 @@ export class Siege {
         if (kind === 'velocity') this.projectileSpeed=Math.min(100,this.projectileSpeed+19);
         if (kind === 'blast') this.blastRadius=4;
         if (kind === 'jammer') this.jammerOwned=true;
-        this.chosen = kind; return true;
+        this.points -= UPGRADE_COSTS[kind]; return true;
     }
     pulse() {
-        if(this.phase!=='combat'||!this.jammerOwned||this.jamCooldown>0)return false;
+        if(this.paused||this.phase!=='combat'||!this.jammerOwned||this.jamCooldown>0)return false;
         this.jamRemaining=4;this.jamCooldown=18;this.events.push({kind:'pulse'});return true;
     }
     private damageEnemy(enemy:Enemy,amount:number) {
@@ -118,21 +138,22 @@ export class Siege {
         const pos={x:enemy.x,y:enemy.y,z:enemy.z};
         this.events.push({kind:'hit',id:enemy.id,pos,hp:enemy.hp,targetKind:enemy.kind});
         if(enemy.hp===0){
-            this.enemies=this.enemies.filter(e=>e.id!==enemy.id);this.kills++;
+            this.enemies=this.enemies.filter(e=>e.id!==enemy.id);this.kills++;this.award(KILL_POINTS[enemy.kind]);
             this.events.push({kind:'kill',id:enemy.id,pos,targetKind:enemy.kind});
         }
     }
     nextWave() {
-        if (this.phase !== 'resupply' || !this.chosen || this.resupplyElapsed < 4) return false;
-        this.wave++; this.waveSize = Math.min(23,5+(this.wave-1)*2); this.spawned = 0;
+        if (this.paused || this.phase !== 'resupply' || this.resupplyElapsed < 4) return false;
+        this.wave++; this.waveSize = this.sizeForWave; this.spawned = 0;
         this.waveElapsed = this.spawnElapsed = this.cooldown = 0;
-        this.phase = 'combat'; this.chosen = null; return true;
+        this.phase = 'combat'; return true;
     }
     tick(dt: number) {
+        if (this.paused) return;
         // Resupply measures elapsed time, not capped combat simulation steps.
         if (this.phase === 'resupply') { this.resupplyElapsed += Math.max(0,dt); return; }
         dt = clamp(dt,0,.05);
-        if (this.phase !== 'combat') return;
+        if (this.paused || this.phase !== 'combat') return;
         this.elapsed += dt; this.waveElapsed += dt; this.spawnElapsed += dt;
         this.cooldown = Math.max(0,this.cooldown-dt);
         this.jamRemaining=Math.max(0,this.jamRemaining-dt);this.jamCooldown=Math.max(0,this.jamCooldown-dt);
@@ -144,7 +165,7 @@ export class Siege {
             const id = ++this.nextId;
             const enemy: Enemy = { id, x:Math.sin(angle)*SPAWN_RADIUS, y:flightHeight(kind,0,id), z:Math.cos(angle)*SPAWN_RADIUS,
                 hp,maxHp:hp,kind,radius:kind==='heavy'?1.35:kind==='armored'?1.05:.95,
-                speed:(2.8+(this.wave-1)*.20)*(kind==='heavy'?.65:kind==='armored'?.82:1),reveal:0,age:0 };
+                speed:(2.8+(this.wave-1)*.20)*this.rules.speed*(kind==='heavy'?.65:kind==='armored'?.82:1),reveal:0,age:0 };
             this.enemies.push(enemy);this.spawnElapsed = 0;this.events.push({kind:'spawn',id:enemy.id});
         }
         const aim = aimDirection(this.yaw,this.pitch);
@@ -191,8 +212,7 @@ export class Siege {
         this.bullets = liveBullets;
         if (this.spawned === this.waveSize && this.enemies.length === 0) {
             this.phase = 'resupply';this.health = Math.min(3,this.health+1);
-            this.bullets = [];this.resupplyElapsed = 0;this.chosen = null;
-            if (!UPGRADES.some(kind=>this.canUpgrade(kind))) this.chosen = 'max';
+            this.bullets = [];this.resupplyElapsed = 0;this.award(WAVE_BONUS);
             this.events.push({kind:'clear'});
         }
     }
