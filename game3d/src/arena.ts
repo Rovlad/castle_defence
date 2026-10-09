@@ -22,12 +22,13 @@ import { STATION, aimDirection, type Siege, type Enemy, type GameEvent } from '.
 export class Arena {
     engine: Engine; scene: Scene; camera: FreeCamera; spotlight: SpotLight;
     private shadow: ShadowGenerator; private weapon: TransformNode; private flash: Mesh; private muzzle: PointLight;
-    private bodies = new Map<number,{root:TransformNode;legs:Mesh[];meshes:Mesh[]}>();
+    private bodies = new Map<number,{root:TransformNode;rotors:Mesh[];meshes:Mesh[]}>();
     private rounds = new Map<number,Mesh>();
     private sparks: {mesh:Mesh;velocity:Vector3;life:number}[] = [];
     private shotFlash = 0; private recoil = 0;
     private stone: StandardMaterial; private metal: StandardMaterial; private amber: StandardMaterial;
     private enemyMaterials: Record<string,StandardMaterial>;
+    private engineGlow: StandardMaterial;
     constructor(canvas:HTMLCanvasElement) {
         this.engine = new Engine(canvas,true,{preserveDrawingBuffer:false,stencil:false, powerPreference:'high-performance'});
         this.scene = new Scene(this.engine);this.scene.clearColor = new Color4(.027,.052,.084,1);
@@ -38,7 +39,8 @@ export class Arena {
         this.scene.activeCamera = this.camera;
         this.stone = this.material('castle stone','#607681');this.metal = this.material('gun metal','#2b3e47');
         this.amber = this.material('lantern glass','#ecbb66',true);
-        this.enemyMaterials = {runner:this.material('runner','#bd7667'),armored:this.material('armor','#8f9db3'),heavy:this.material('heavy','#738e75')};
+        this.enemyMaterials = {scout:this.material('scout drone','#a47862'),armored:this.material('armored drone','#8f9db3'),heavy:this.material('heavy drone','#738e75')};
+        this.engineGlow = this.material('engine glow','#86d8e3',true);
         const hemi = new HemisphericLight('night ambient',new Vector3(0,1,0),this.scene);hemi.intensity = .32;
         hemi.diffuse = new Color3(.55,.68,.84);hemi.groundColor = new Color3(.12,.18,.21);
         const moonlight = new DirectionalLight('moonlight',new Vector3(.35,-1,.5),this.scene);moonlight.intensity = .25;
@@ -112,18 +114,28 @@ export class Arena {
     private createEnemy(enemy:Enemy) {
         const root=new TransformNode(`enemy ${enemy.id}`,this.scene),mat=this.enemyMaterials[enemy.kind];
         const heavy=enemy.kind==='heavy',armored=enemy.kind==='armored',scale=heavy?1.35:armored?1.1:1;
-        const torso=this.box('torso',.8*scale,1.0*scale,.5*scale,mat,new Vector3(0,1.25,0),root);
-        const head=MeshBuilder.CreateSphere('head',{diameter:.58*scale,segments:heavy?6:8},this.scene);head.parent=root;head.position.y=2.0;head.material=mat;
-        for(const x of [-.16,.16])this.box('glowing eye',.09,.05,.08,this.amber,new Vector3(x,2.04,-.26*scale),root);
-        const legs:Mesh[]=[];
-        for(const side of [-1,1]) {
-            const leg=this.box('leg',.22*scale,.8,.24*scale,mat,new Vector3(side*.23,.45,0),root);legs.push(leg);
-            this.box('arm',.22,.85,.22,mat,new Vector3(side*.56*scale,1.1,0),root);
-            if(heavy){const horn=MeshBuilder.CreateCylinder('horn',{height:.45,diameterTop:0,diameterBottom:.18,tessellation:5},this.scene);horn.parent=root;horn.position.set(side*.28,2.45,0);horn.rotation.z=side*-.3;horn.material=mat;}
-            if(armored)this.box('shoulder plate',.4,.3,.5,this.metal,new Vector3(side*.5,1.65,0),root);
+        const hull=MeshBuilder.CreateSphere('drone hull',{diameter:1,segments:8},this.scene);
+        hull.parent=root;hull.scaling.set(.9*scale,.38*scale,1.25*scale);hull.material=mat;
+        const rotors:Mesh[]=[];
+        const count=heavy?6:4;
+        for(let i=0;i<count;i++) {
+            const angle=(i+.5)*Math.PI*2/count, reach=.85*scale;
+            const x=Math.sin(angle)*reach,z=Math.cos(angle)*reach;
+            const strut=this.box('rotor strut',.09*scale,.07,reach,this.metal,new Vector3(x/2,0,z/2),root);strut.rotation.y=angle;
+            const pod=MeshBuilder.CreateCylinder('rotor pod',{height:.13*scale,diameter:.46*scale,tessellation:10},this.scene);
+            pod.parent=root;pod.position.set(x,0,z);pod.material=this.metal;
+            const rotor=this.box('spinning rotor',.55*scale,.025,.08*scale,mat,new Vector3(x,.10*scale,z),root);rotors.push(rotor);
+            const exhaust=MeshBuilder.CreateCylinder('engine exhaust',{height:.18,diameterTop:.18*scale,diameterBottom:.06,tessellation:6},this.scene);
+            exhaust.parent=root;exhaust.position.set(x,-.14*scale,z);exhaust.material=this.engineGlow;
         }
+        for(const x of [-.18,.18])this.box('navigation light',.1,.05,.08,this.amber,new Vector3(x*scale,0,-.57*scale),root);
+        if(armored) {
+            this.box('armored shell',.68,.14,.72,this.metal,new Vector3(0,.18,0),root);
+            for(const side of [-1,1])this.box('armor plate',.15,.24,.8,mat,new Vector3(side*.42,.02,0),root);
+        }
+        if(heavy)this.box('heavy fuselage',.85,.38,1.0,mat,new Vector3(0,-.13,0),root);
         const meshes=root.getChildMeshes() as Mesh[];meshes.forEach(mesh=>{mesh.isPickable=false;this.shadow.addShadowCaster(mesh);});
-        torso.receiveShadows=true;this.bodies.set(enemy.id,{root,legs,meshes});return this.bodies.get(enemy.id)!;
+        hull.receiveShadows=true;this.bodies.set(enemy.id,{root,rotors,meshes});return this.bodies.get(enemy.id)!;
     }
     event(event:GameEvent) {
         if(event.kind==='shot'){this.shotFlash=.07;this.recoil=.055;}
@@ -142,10 +154,11 @@ export class Arena {
         for(const [id,body] of this.bodies)if(!ids.has(id)){body.meshes.forEach(mesh=>this.shadow.removeShadowCaster(mesh));body.root.dispose();this.bodies.delete(id);}
         for(const enemy of game.enemies) {
             const body=this.bodies.get(enemy.id)||this.createEnemy(enemy);
-            body.root.position.set(enemy.x,0,enemy.z);body.root.rotation.y=Math.atan2(enemy.x,enemy.z);
+            body.root.position.set(enemy.x,enemy.y,enemy.z);
+            body.root.rotation.set(.035+Math.sin(enemy.age*1.6)*.025,Math.atan2(enemy.x,enemy.z),Math.sin(enemy.age*1.3)*.04);
             body.root.setEnabled(enemy.reveal>0);
             body.meshes.forEach(mesh=>mesh.visibility=enemy.reveal);
-            body.legs.forEach((leg,index)=>leg.rotation.x=Math.sin(enemy.age*8+index*Math.PI)*.35);
+            body.rotors.forEach((rotor,index)=>rotor.rotation.y=enemy.age*32*(index%2?1:-1));
         }
         const roundIds=new Set(game.bullets.map(b=>b.id));
         for(const [id,mesh] of this.rounds)if(!roundIds.has(id)){mesh.dispose();this.rounds.delete(id);}

@@ -1,4 +1,4 @@
-import { Siege, STATION, segmentHit, aimDirection, type Enemy } from './src/model.ts';
+import { Siege, STATION, segmentHit, aimDirection, flightHeight, type Enemy } from './src/model.ts';
 import { radarPoint, radarSector } from './src/radar.ts';
 function assert(condition:unknown,message:string) {if(!condition)throw Error(message);}
 const advance=(g:Siege,seconds:number)=>{for(let i=0;i<Math.ceil(seconds/.025);i++)g.tick(.025);};
@@ -11,9 +11,15 @@ assert(g.enemies[0].reveal>0,'Opening enemy appears inside searchlight');
 const position=JSON.stringify(STATION);g.aim(1,.1);g.aim(-1,-.1);assert(JSON.stringify(STATION)===position,'Aim cannot change station position');
 g.aim(0,100);assert(g.pitch===.6,'Pitch is clamped');g.aim(0,-100);assert(g.pitch===-.28,'Upward pitch is clamped');
 g.pitch=.1;for(let i=0;i<5;i++){g.fire();g.tick(.15);}assert(g.bullets.length<=3,'Bullet slots are capped');
-const target=(id:number,hp=1,x=0,z=20):Enemy=>({id,x,z,hp,maxHp:hp,radius:1,speed:0,kind:'runner',reveal:1,age:0});
-const combat=new Siege();combat.start();combat.pitch=Math.atan2(STATION.y-1.35,20);combat.enemies=[target(100)];combat.fire();advance(combat,.4);
+const target=(id:number,hp=1,x=0,z=20):Enemy=>({id,x,y:flightHeight('scout',0,id),z,hp,maxHp:hp,radius:1,speed:0,kind:'scout',reveal:1,age:0});
+const combat=new Siege();combat.start();combat.enemies=[target(100)];combat.pitch=Math.atan2(STATION.y-combat.enemies[0].y,20);combat.fire();advance(combat,.4);
 assert(combat.kills===1&&combat.enemies.length===0,'Aimed swept bullet kills target');
+assert(combat.drainEvents().filter(e=>e.kind==='hit').every(e=>e.pos&&e.pos.y>2.7),'Impacts occur at flight height');
+const below=new Siege();below.start();below.enemies=[target(200)];below.pitch=Math.atan2(STATION.y-1.35,20);below.fire();advance(below,.45);
+assert(below.kills===0&&below.enemies[0].hp===1,'Shots at former ground hitbox pass below flying targets');
+for(const kind of ['scout','armored','heavy'] as const)for(let age=0;age<15;age+=.1){
+    const y=flightHeight(kind,age,42);assert(y>2.7&&y<4.1&&y<STATION.y,'All target tiers stay low above ground and below the turret');
+}
 const armor=new Siege();armor.start();armor.pitch=combat.pitch;armor.enemies=[target(100,2)];armor.fire();advance(armor,.4);
 assert(armor.enemies[0].hp===1&&armor.kills===0,'Armor needs another hit');armor.fire();advance(armor,.4);assert(armor.kills===1,'Second hit kills armor');
 const breaches=new Siege();breaches.start();breaches.enemies=[target(1,1,0,7),target(2,1,7,0)];breaches.tick(.025);
@@ -40,4 +46,4 @@ assert(radarPoint(0,0).x===80&&radarPoint(0,0).y===80,'Castle stays at radar cen
 assert(Math.abs(radarPoint(0,20).y-80)<Math.abs(north.y-80),'Approaching targets move inward');
 const sector=radarSector(Math.PI/2,Math.PI/5);
 assert(Math.abs(sector.start+sector.end)<1e-8&&Math.abs(sector.end-sector.start-Math.PI/5)<1e-8,'Radar beam points east and matches searchlight width');
-console.log('PASS: fixed station, aim bounds, swept hits, bullets, armor, castle health, waves, one upgrade, timers, maxima and enemy tiers.');
+console.log('PASS: fixed station, flying-target heights and hitboxes, swept hits, armor, castle health, waves, upgrades, radar and timing.');
