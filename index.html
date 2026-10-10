@@ -229,6 +229,9 @@
         }
         body { background: radial-gradient(ellipse at top, #182a3c, #060d17 70%); color: #e3edf5; }
         #gameContainer { max-width: 720px; gap: 14px; }
+        @media (min-width: 900px) {
+            #gameContainer { width: min(960px, 100%); max-width: 960px; }
+        }
         #gameCanvas { border-color: #344c60; box-shadow: 0 0 70px #050b14, 0 0 0 7px #111f2d; }
         #ui-left, #ui-right { background: #101e2bdd; padding: 12px; border: 1px solid #304455;
             border-radius: 12px; line-height: 1.7; color: #a9bdcf; }
@@ -518,9 +521,11 @@
                 
                 // For hit animation
                 this.hitFlash = 0;
+                this.rotorPhase = Math.random() * Math.PI;
             }
             
             update(deltaTime) {
+                this.rotorPhase = (this.rotorPhase + deltaTime * 35) % (Math.PI * 2);
                 // Decay the hit flash here rather than in draw() so it fades on schedule
                 // even while the monster sits hidden outside the beam
                 if (this.hitFlash > 0) {
@@ -603,29 +608,34 @@
                 ctx.translate(this.x, this.y);
                 ctx.rotate(Math.atan2(centerY - this.y, centerX - this.x));
                 const r = this.radius;
-                const color = this.monsterType === 'heavy' ? '#719b80' : this.monsterType === 'armored' ? '#a797c9' : '#c77d6c';
-                ctx.fillStyle = this.hitFlash > 0 ? '#fff4d6' : color;
-                ctx.strokeStyle = '#1a202b'; ctx.lineWidth = 3;
-                ctx.beginPath();
-                if (this.monsterType === 'heavy') {
-                    // Broad jagged shell and horns.
-                    ctx.moveTo(r, 0); ctx.lineTo(r * .65, -r); ctx.lineTo(-r * .7, -r);
-                    ctx.lineTo(-r, -r * .5); ctx.lineTo(-r, r * .5); ctx.lineTo(-r * .7, r);
-                    ctx.lineTo(r * .65, r);
-                } else if (this.monsterType === 'armored') {
-                    // Hexagonal plate distinguishes armor from the narrow runner.
-                    for (let i = 0; i < 6; i++) {
-                        const a = i * Math.PI / 3;
-                        if (i === 0) ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
-                        else ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
-                    }
-                } else {
-                    ctx.moveTo(r + 6, 0); ctx.lineTo(-r, -r * .7);
-                    ctx.lineTo(-r * .55, 0); ctx.lineTo(-r, r * .7);
+                const color = this.monsterType === 'heavy' ? '#8098ad' : this.monsterType === 'armored' ? '#a797c9' : '#c77d6c';
+                const rotorCount = this.monsterType === 'heavy' ? 6 : 4;
+                // Rotor arms and spinning blades distinguish drones from ground creatures.
+                for (let i = 0; i < rotorCount; i++) {
+                    const angle = (i + .5) * Math.PI * 2 / rotorCount;
+                    const x = Math.cos(angle) * r * .72, y = Math.sin(angle) * r * .72;
+                    ctx.strokeStyle = '#8fa5b8'; ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(x, y); ctx.stroke();
+                    ctx.fillStyle = '#263b4b'; ctx.strokeStyle = '#a1b5c6'; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.arc(x, y, r * .24, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    const blade = this.rotorPhase * (i % 2 ? -1 : 1);
+                    const dx = Math.cos(blade) * r * .29, dy = Math.sin(blade) * r * .29;
+                    ctx.strokeStyle = '#d5e3e9'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(x - dx, y - dy); ctx.lineTo(x + dx, y + dy); ctx.stroke();
                 }
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff4d6' : color;
+                ctx.strokeStyle = '#1a202b'; ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(r * .58, 0); ctx.lineTo(r * .25, -r * .36);
+                ctx.lineTo(-r * .48, -r * .3); ctx.lineTo(-r * .58, 0);
+                ctx.lineTo(-r * .48, r * .3); ctx.lineTo(r * .25, r * .36);
                 ctx.closePath(); ctx.fill(); ctx.stroke();
-                ctx.fillStyle = '#ffe3a3'; ctx.shadowColor = '#ffc170'; ctx.shadowBlur = 8;
-                ctx.fillRect(r * .3, -6, 4, 3); ctx.fillRect(r * .3, 3, 4, 3);
+                if (this.monsterType !== 'normal') {
+                    ctx.strokeStyle = '#d1dce4'; ctx.lineWidth = 1.5;
+                    ctx.strokeRect(-r * .25, -r * .22, r * .45, r * .44);
+                }
+                ctx.fillStyle = '#91e6ed'; ctx.shadowColor = '#62dce9'; ctx.shadowBlur = 7;
+                ctx.fillRect(r * .3, -2, 4, 4);
                 ctx.shadowBlur = 0;
                 ctx.restore();
                 if (this.maxHp > 1) {
