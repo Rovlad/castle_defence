@@ -320,12 +320,12 @@
 <body>
     <div id="gameContainer">
         <div id="battlefield"><canvas id="gameCanvas" width="800" height="800"></canvas>
-            <aside id="radarPanel" aria-label="Drone radar"><span>RADAR</span><canvas id="radarCanvas" width="128" height="128" role="img" aria-label="Drone radar: north up, castle at centre"></canvas><small id="radarCount">0 targets</small></aside>
+            <aside id="radarPanel" aria-label="Drone radar"><span>RADAR</span><canvas id="radarCanvas" width="128" height="128" role="img" aria-label="Drone radar: north up, refinery at centre"></canvas><small id="radarCount">0 targets</small></aside>
             <div id="breachWarning" role="status" hidden></div></div>
         <header id="statusBar" aria-label="Game status">
             <div class="status-primary">
                 <strong>Wave <span id="level">1</span></strong>
-                <span>Castle <span id="health" aria-label="Castle health">3 / 3</span></span>
+                <span>Equipment <span id="health" aria-label="Operational refinery equipment">5 / 5</span></span>
                 <span>Ammo <span id="ammo">3 / 3</span></span>
             </div>
             <div class="status-secondary">
@@ -380,6 +380,7 @@
                     <button id="damageUpgradeBtn">Stronger shots<small>+1 direct damage · maximum 3</small><span id="damagePrice"></span></button>
                     <button id="velocityUpgradeBtn">Faster rounds<small>Faster travel · two upgrades</small><span id="velocityPrice"></span></button>
                     <button id="blastUpgradeBtn">Explosive shells<small>Nearby drones take 1 splash damage</small><span id="blastPrice"></span></button>
+                    <button id="repairUpgradeBtn">Repair equipment<small>Restore one destroyed unit · key 7</small><span id="repairPrice"></span></button>
                 </div>
                 <p id="breakStatus" role="status" aria-live="polite"></p>
                 <button id="nextWaveBtn" disabled>Start next wave</button>
@@ -409,7 +410,7 @@
             SPACE to shoot<br>
             <strong>Start with 3 bullets at once!</strong><br>
             Wait for bullets to hit or leave before shooting again<br>
-            Clear each wave, then choose an upgrade.<br>Recover 1 castle health between waves.<br>Press Enter or tap Start to begin.
+            Protect the refinery’s five pieces of equipment.<br>Each drone breach destroys one; losing all five ends the run.<br>Clear waves to buy upgrades or repair one piece for 50 points.<br>Press Enter or tap Start to begin.
         </div>
         <div id="topScores">
             <h3>Top 3 Scores</h3>
@@ -458,7 +459,8 @@
                 settingsOpenedAt: 0,
                 lastDroneSoundTime: 0,
                 firstSpawn: true,
-                health: 3,
+                equipment: Array.from({length:5},(_,i)=>({name:['Storage tank','Distillation column','Heat exchanger','Pump station','Cooling unit'][i],x:Math.cos(-Math.PI/2+i*Math.PI*2/5)*44,y:Math.sin(-Math.PI/2+i*Math.PI*2/5)*44,destroyed:false})),
+                get health(){return this.equipment.filter(unit=>!unit.destroyed).length;},
                 damageFlash: 0,
                 muzzleFlash: 0,
                 particles: [],
@@ -576,7 +578,8 @@
                     if (!this.atCastle) {
                         this.atCastle = true;
                         gameState.waveBreaches++;
-                        gameState.health = Math.max(0, gameState.health - 1);
+                        const unit=gameState.equipment.filter(unit=>!unit.destroyed).sort((a,b)=>Math.hypot(centerX+a.x-this.x,centerY+a.y-this.y)-Math.hypot(centerX+b.x-this.x,centerY+b.y-this.y))[0];
+                        if(unit){unit.destroyed=true;spawnParticles(centerX+unit.x,centerY+unit.y,'#ffb36b',28);}
                         gameState.damageFlash = 0.6;
                         spawnParticles(this.x, this.y, '#ed957c', 22);
                         playSound('breach');
@@ -818,9 +821,10 @@
             ammo:{cost:50,button:'ammoUpgradeBtn',price:'ammoPrice'},
             damage:{cost:100,button:'damageUpgradeBtn',price:'damagePrice'},
             velocity:{cost:60,button:'velocityUpgradeBtn',price:'velocityPrice'},
-            blast:{cost:150,button:'blastUpgradeBtn',price:'blastPrice'}
+            blast:{cost:150,button:'blastUpgradeBtn',price:'blastPrice'},
+            repair:{cost:50,button:'repairUpgradeBtn',price:'repairPrice'}
         };
-        function canUpgrade(kind){return kind==='beam'?gameState.beamWidth<Math.PI/2-.001:kind==='rotation'?gameState.rotationSpeed<5.4-.001:kind==='ammo'?gameState.bulletLimit<6:kind==='damage'?gameState.shotDamage<3:kind==='velocity'?gameState.projectileSpeed<14:kind==='blast'?gameState.blastRadius===0:false;}
+        function canUpgrade(kind){return kind==='beam'?gameState.beamWidth<Math.PI/2-.001:kind==='rotation'?gameState.rotationSpeed<5.4-.001:kind==='ammo'?gameState.bulletLimit<6:kind==='damage'?gameState.shotDamage<3:kind==='velocity'?gameState.projectileSpeed<14:kind==='blast'?gameState.blastRadius===0:kind==='repair'?gameState.health>0&&gameState.health<5:false;}
         function awardPoints(points){gameState.points+=points;gameState.earnedPoints+=points;gameState.wavePoints+=points;}
         function finishWave() {
             if(gameState.phase!=='combat'||gameState.blinkingPhase||gameState.gameOver)return;
@@ -831,9 +835,8 @@
             document.getElementById('waveResults').textContent=`${gameState.waveKills} kills · ${gameState.waveBreaches} breaches · ${accuracy}% accuracy (${gameState.waveHits}/${gameState.waveShots} shots) · ${formatTime((Date.now()-gameState.waveStartTime)/1000)} combat · ${gameState.wavePoints} points earned`;
             document.getElementById('flawlessBonus').textContent=flawless?'FLAWLESS DEFENCE · +50 bonus points':'No flawless bonus this wave. Keep every drone out to earn +50.';
             gameState.bullets=[];gameState.bouncingBullets=[];clearKeys();
-            const repaired=gameState.health<3;gameState.health=Math.min(3,gameState.health+1);
             document.getElementById('upgradeTitle').textContent=`Wave ${gameState.level} cleared`;
-            document.getElementById('breakSummary').textContent=(repaired?'One health restored.':'Castle at full health.')+' +20 points for clearing the wave.';
+            document.getElementById('breakSummary').textContent=`${gameState.health} / 5 equipment operational. +20 points for clearing the wave. Repairs cost 50 points each.`;
             document.getElementById('upgradePanel').style.display='flex';updateBreak();updateHud();playSound('clear');
             const available=Object.values(SHOP).find(item=>!document.getElementById(item.button).disabled);
             document.getElementById(available?available.button:'upgradePanel').focus();
@@ -847,7 +850,7 @@
             for(const [kind,item] of Object.entries(SHOP)){
                 const maxed=!canUpgrade(kind),poor=gameState.points<item.cost;
                 document.getElementById(item.button).disabled=maxed||poor;
-                document.getElementById(item.price).textContent=maxed?'MAXED':`${item.cost} points${poor?' · Not enough points':''}`;
+                document.getElementById(item.price).textContent=maxed?(kind==='repair'?'All equipment operational':'MAXED'):`${item.cost} points${poor?' · Not enough points':''}`;
             }
         }
         function chooseUpgrade(kind){
@@ -858,6 +861,7 @@
             if(kind==='damage')gameState.shotDamage++;
             if(kind==='velocity')gameState.projectileSpeed=Math.min(14,gameState.projectileSpeed+3);
             if(kind==='blast')gameState.blastRadius=55;
+            if(kind==='repair')gameState.equipment.find(unit=>unit.destroyed).destroyed=false;
             gameState.points-=SHOP[kind].cost;updateBreak();updateHud();playSound('upgrade');
             document.getElementById(document.getElementById('nextWaveBtn').disabled?'upgradePanel':'nextWaveBtn').focus();
         }
@@ -871,7 +875,7 @@
             gameState.lastSpawnTime=gameState.lastUpdateTime=now;gameState.firstSpawn=true;gameState.phase='combat';
             clearKeys();unlockAudio();document.getElementById('upgradePanel').style.display='none';updateHud();document.getElementById('fireBtn').focus();
         }
-        for(const kind of ['damage','velocity','blast'])document.getElementById(SHOP[kind].button).addEventListener('click',()=>chooseUpgrade(kind));
+        for(const kind of ['damage','velocity','blast','repair'])document.getElementById(SHOP[kind].button).addEventListener('click',()=>chooseUpgrade(kind));
         document.getElementById('beamUpgradeBtn').addEventListener('click', () => chooseUpgrade('beam'));
         document.getElementById('rotationUpgradeBtn').addEventListener('click', () => chooseUpgrade('rotation'));
         document.getElementById('ammoUpgradeBtn').addEventListener('click', () => chooseUpgrade('ammo'));
@@ -895,41 +899,31 @@
             ground.fillStyle = '#25323d'; ground.fillRect(-9,-4,18,8);
             ground.fillStyle = '#3a4750'; ground.fillRect(-9,-4,18,2); ground.restore();
         }
-        function drawCastle() {
+        function drawRefinery() {
             ctx.save(); ctx.translate(centerX, centerY);
             ctx.shadowColor = '#000'; ctx.shadowBlur = 20;
             const foundation = ctx.createRadialGradient(-15,-20,5,0,0,67);
             foundation.addColorStop(0,'#566976'); foundation.addColorStop(1,'#182a36');
             ctx.fillStyle = foundation; ctx.beginPath(); ctx.arc(0,0,65,0,Math.PI*2); ctx.fill();
             ctx.shadowBlur = 0; ctx.strokeStyle = '#82949e'; ctx.lineWidth = 2; ctx.stroke();
-            // Stone platform, beveled walls and staggered masonry joints.
-            const stone = ctx.createRadialGradient(-28,-30,4,15,20,90);
-            stone.addColorStop(0,gameState.damageFlash>0?'#bb7967':'#a1b0b5');
-            stone.addColorStop(1,gameState.damageFlash>0?'#683e3a':'#425766');
-            ctx.fillStyle = stone; ctx.fillRect(-44,-44,88,88);
-            ctx.strokeStyle = '#243847'; ctx.lineWidth = 5; ctx.strokeRect(-44,-44,88,88);
-            ctx.strokeStyle = '#cad3cd'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(-44,44); ctx.lineTo(-44,-44); ctx.lineTo(44,-44); ctx.stroke();
-            ctx.strokeStyle = '#354b59'; ctx.lineWidth = 1;
-            for(let row=0;row<5;row++){
-                const y=-42+row*17;ctx.beginPath();ctx.moveTo(-42,y);ctx.lineTo(42,y);ctx.stroke();
-                for(let x=-42+(row%2?9:0);x<42;x+=18){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,Math.min(42,y+17));ctx.stroke();}
+            // Five industrial units and their pipes surround the central cannon.
+            ctx.strokeStyle='#71858d';ctx.lineWidth=3;
+            for(const unit of gameState.equipment){
+                ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(unit.x,0);ctx.lineTo(unit.x,unit.y);ctx.stroke();
             }
-            // Four raised corner bastions with crenellated rims.
-            for(const x of [-40,40])for(const y of [-40,40]){
-                ctx.fillStyle='#263b49';ctx.fillRect(x-15,y-13,30,30);
-                ctx.fillStyle=stone;ctx.fillRect(x-15,y-16,30,28);
-                ctx.strokeStyle='#b5c1c1';ctx.lineWidth=1;ctx.strokeRect(x-15,y-16,30,28);
-                ctx.fillStyle='#344b5a';ctx.fillRect(x-8,y-9,16,14);
-                ctx.fillStyle='#afbbb9';
-                for(const offset of [-12,-2,8]){ctx.fillRect(x+offset,y-17,5,6);ctx.fillRect(x+offset,y+8,5,6);}
-            }
-            for(const x of [-27,27]){
-                ctx.fillStyle='#142531';ctx.fillRect(x-4,-25,8,13);
-                ctx.fillStyle='#f2cc7e';ctx.shadowColor='#ffc16b';ctx.shadowBlur=10;ctx.fillRect(x-2,-22,4,8);ctx.shadowBlur=0;
-            }
-            if(gameState.health<3){ctx.strokeStyle='#17222d';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-40,20);ctx.lineTo(-26,9);ctx.lineTo(-29,-7);ctx.stroke();}
-            if(gameState.health<2){ctx.beginPath();ctx.moveTo(42,17);ctx.lineTo(20,2);ctx.lineTo(31,-16);ctx.stroke();}
+            ctx.strokeStyle='#c4ad65';ctx.lineWidth=2;ctx.setLineDash([5,4]);
+            ctx.beginPath();ctx.arc(0,0,61,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+            gameState.equipment.forEach((unit,i)=>{
+                ctx.save();ctx.translate(unit.x,unit.y);
+                ctx.fillStyle=unit.destroyed?'#222a2e':'#607d88';ctx.strokeStyle=unit.destroyed?'#493d37':'#bad1d4';ctx.lineWidth=2;
+                if(i===0||i===4){ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.beginPath();ctx.arc(0,0,8,0,Math.PI*2);ctx.stroke();}
+                else {ctx.fillRect(-11,-14,22,28);ctx.strokeRect(-11,-14,22,28);for(let y=-8;y<=8;y+=8){ctx.beginPath();ctx.moveTo(-9,y);ctx.lineTo(9,y);ctx.stroke();}}
+                if(unit.destroyed){
+                    ctx.strokeStyle='#161d21';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-12,-11);ctx.lineTo(9,7);ctx.lineTo(3,13);ctx.stroke();
+                    ctx.fillStyle='#ef854d';ctx.fillRect(-5,5,4,3);ctx.fillRect(5,-2,3,3);
+                }else{ctx.fillStyle='#7ef0a7';ctx.shadowColor='#69e99c';ctx.shadowBlur=7;ctx.fillRect(-3,-3,6,4);ctx.shadowBlur=0;}
+                ctx.restore();
+            });
             // Fixed turret bearing with a rotating, recoiling cannon assembly.
             ctx.fillStyle='#203542';ctx.beginPath();ctx.arc(0,0,27,0,Math.PI*2);ctx.fill();
             ctx.strokeStyle='#b4bfc0';ctx.lineWidth=3;ctx.stroke();
@@ -1033,12 +1027,12 @@
         function updateHud() {
             document.getElementById('points').textContent=gameState.points;
             document.getElementById('radarCount').textContent=`${gameState.monsters.length} targets`;
-            document.getElementById('radarCanvas').setAttribute('aria-label',`Radar: ${gameState.monsters.length} drones. North up; castle at centre.`);
+            document.getElementById('radarCanvas').setAttribute('aria-label',`Radar: ${gameState.monsters.length} drones. North up; refinery at centre.`);
             const threat=breachThreat(),warning=document.getElementById('breachWarning');warning.hidden=!threat;
             if(threat){const side=Math.abs(threat.bearing)>Math.PI*.65?'behind':threat.bearing<-.3?'left':threat.bearing>.3?'right':'ahead';
                 const message=`BREACH WARNING · Drone ${side}`;if(warning.textContent!==message)warning.textContent=message;}
 
-            document.getElementById('health').textContent = `${gameState.health} / 3`;
+            document.getElementById('health').textContent = `${gameState.health} / 5`;
             document.getElementById('ammo').textContent = `${gameState.bulletLimit-gameState.bullets.length} / ${gameState.bulletLimit}`;
             document.getElementById('level').textContent = gameState.level;
             document.getElementById('kills').textContent = gameState.kills;
@@ -1055,7 +1049,7 @@
             document.getElementById('waveTime').textContent = formatTime(gameState.waveElapsed);
             const pending = gameState.waveSize-gameState.waveSpawned;
             const combat = gameState.gameStarted && gameState.phase === 'combat' && !gameState.gameOver && !gameState.blinkingPhase;
-            document.getElementById('waveStatus').textContent = gameState.health === 0 ? 'Castle lost' :
+            document.getElementById('waveStatus').textContent = gameState.health === 0 ? 'Refinery lost' :
                 gameState.phase === 'intermission' ? 'Wave cleared' : !gameState.gameStarted ? 'Ready' : pending === 0 ? 'Finish the last enemies' : 'Hold the line';
             const nextIn = Math.max(0,Math.ceil((gameState.firstSpawn ? 2.5 : gameState.monsterSpawnInterval)-(Date.now()-gameState.lastSpawnTime)/1000));
             document.getElementById('nextArrival').textContent = combat && pending > 0 ? formatTime(nextIn) : '—';
@@ -1193,7 +1187,7 @@
             for (let i=0;i<4;i++) {
                 ctx.beginPath(); ctx.arc(400,400,145+i*53,.3+i,1.6+i); ctx.stroke();
             }
-            drawCastle();drawRadar();
+            drawRefinery();drawRadar();
             if (gameState.damageFlash > 0) {
                 ctx.strokeStyle = `rgba(235,121,93,${gameState.damageFlash*.7})`;
                 ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(400,400,380,0,Math.PI*2); ctx.stroke();
@@ -1368,6 +1362,7 @@
                 else if (e.code === 'Digit4') chooseUpgrade('damage');
                 else if (e.code === 'Digit5') chooseUpgrade('velocity');
                 else if (e.code === 'Digit6') chooseUpgrade('blast');
+                else if (e.code === 'Digit7') chooseUpgrade('repair');
                 else if (e.code === 'Enter' && !(e.target instanceof HTMLButtonElement)) nextWave();
                 else if (e.code === 'Tab') {
                     const choices = [...Object.values(SHOP).map(item=>item.button),'nextWaveBtn']

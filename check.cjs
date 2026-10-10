@@ -70,13 +70,16 @@ for(let i=0;i<4;i++)g.elements.fireBtn.listeners.click();
 assert.equal(g.t.state.bullets.length,3);
 g.advance(12345);
 const monster = new g.t.Monster(); monster.x=400;monster.y=400;monster.update(.016);
-assert.equal(g.t.state.health,2);
+assert.equal(g.t.state.health,4);
 assert.equal(g.t.state.blinkingPhase,false);
-monster.update(.016);assert.equal(g.t.state.health,2); // A breach cannot damage twice.
+monster.update(.016);assert.equal(g.t.state.health,4); // A breach cannot damage twice.
 const second = new g.t.Monster();second.x=400;second.y=400;second.update(.016);
-assert.equal(g.t.state.health,1);assert.equal(g.t.state.blinkingPhase,false);
+assert.equal(g.t.state.health,3);assert.equal(g.t.state.blinkingPhase,false);
 const third = new g.t.Monster();third.x=400;third.y=400;third.update(.016);
+assert.equal(g.t.state.health,2);assert(!g.t.state.blinkingPhase);
+for(let i=0;i<2;i++){const drone=new g.t.Monster();drone.x=400;drone.y=400;drone.update(.016);}
 assert.equal(g.t.state.health,0);assert(g.t.state.blinkingPhase);
+assert(g.t.state.equipment.every(unit=>unit.destroyed));
 assert.equal(g.t.state.survivalTime,12);
 g.advance(5000);g.t.updateGame();assert(g.t.state.gameOver);
 const x = g.t.state.bullets[0].x;
@@ -89,7 +92,7 @@ assert.equal(g.t.state.highScores[0].time,12);
 assert(g.elements.scoresList.innerHTML.includes('&lt;b&gt; A B'));
 assert(!g.elements.scoresList.innerHTML.includes('<b> A B'));
 assert.equal(boot().t.state.highScores.length,1);
-assert.equal(g.t.state.health,3);
+assert.equal(g.t.state.health,5);
 assert.equal(g.t.state.particles.length,0);
 const opening = boot();opening.t.startGame();opening.advance(2400);opening.t.updateGame();
 assert.equal(opening.t.state.monsters.length,0);
@@ -144,9 +147,9 @@ for(let i=0;i<5;i++) {
     assert.equal(waves.t.state.phase,'combat'); // Wave is not cleared while any enemy remains.
     waves.t.state.monsters=[];
 }
-waves.t.state.health=1;
+waves.t.state.equipment.slice(0,4).forEach(unit=>unit.destroyed=true);
 waves.advance(16);waves.t.updateGame();
-assert.equal(waves.t.state.phase,'intermission');assert.equal(waves.t.state.health,2);
+assert.equal(waves.t.state.phase,'intermission');assert.equal(waves.t.state.health,1);
 assert.equal(waves.elements.waveResolved.textContent,'5 / 5');
 assert.equal(waves.elements.waveProgress.value,5);
 assert.equal(waves.elements.nextArrival.textContent,'—');
@@ -306,9 +309,18 @@ const unsupported=boot();assert.equal(unsupported.elements.testSoundBtn.disabled
 assert.equal(boot(true).t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','broken json');assert.equal(boot().t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','[{"name":"bad"}]');assert.equal(boot().t.state.highScores.length,0);
+const repair=boot();repair.t.startGame();repair.t.state.equipment.slice(0,3).forEach(unit=>unit.destroyed=true);repair.t.finishWave();
+assert.equal(repair.t.state.health,2,'Wave clear does not repair equipment automatically');
+repair.t.state.points=49;repair.t.chooseUpgrade('repair');assert.equal(repair.t.state.health,2);assert.equal(repair.t.state.points,49);
+repair.t.state.points=150;for(let i=0;i<3;i++){repair.t.chooseUpgrade('repair');assert.equal(repair.t.state.health,3+i);assert.equal(repair.t.state.points,100-i*50);}
+assert.equal(repair.elements.repairUpgradeBtn.disabled,true);assert.equal(repair.elements.repairPrice.textContent,'All equipment operational');
+repair.t.state.points=100;repair.t.chooseUpgrade('repair');assert.equal(repair.t.state.points,100);
+repair.t.resetToStartScreen();assert.equal(repair.t.state.health,5);assert(repair.t.state.equipment.every(unit=>!unit.destroyed));
+
 console.log('PASS: existing controls/combat/scoring plus finite waves, survivor gating, repairs, break/choice gating, paid capped upgrades, expanded ammo, reset, pause accounting, bounded/panned audio, mute persistence and hidden-page audio suspension.');
 console.log('PASS: iOS playback session, gesture retry after interruption, unmute/test chime, async/denied resume, closed-context recovery, unsupported audio and denied session setting.');
 })().catch(error => { console.error(error);process.exitCode=1; });
+
 
 
 
