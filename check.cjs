@@ -35,7 +35,7 @@ function boot(blockStorage = false, withAudio = false) {
     sandbox.document.createElement = () => ({width:800,height:800,getContext:()=>ctx});
     const audio = {started:0, resumed:0, suspended:0, disconnected:0, pans:[], oscillators:[], gains:[], contexts:[]};
     if (withAudio) {
-        const param = () => ({value:0,setValueAtTime(value){this.value=value;},exponentialRampToValueAtTime(){}});
+        const param = () => ({value:0,ramps:[],setValueAtTime(value){this.value=value;},exponentialRampToValueAtTime(value,time){this.ramps.push({value,time});}});
         const node = () => ({connect(){},disconnect(){audio.disconnected++;}});
         sandbox.window.AudioContext = class {
             constructor(){this.state='running';this.currentTime=0;this.destination={};audio.contexts.push(this);}
@@ -257,18 +257,20 @@ const droneSound=boot(false,true);droneSound.t.startGame();
 const distantDrone=new droneSound.t.Monster();distantDrone.x=700;distantDrone.y=400;distantDrone.speed=0;
 droneSound.t.state.monsters=[distantDrone];droneSound.t.state.waveSpawned=1;
 droneSound.advance(250);droneSound.t.updateGame();
-assert.equal(droneSound.audio.started,1,'Drone beyond the former 220px sound radius emits rotor audio');
-const farGain=droneSound.audio.gains.at(-1).gain.value;
-droneSound.advance(100);droneSound.t.updateGame();assert.equal(droneSound.audio.started,1,'Rotor sound respects its cadence');
+assert.equal(droneSound.audio.started,3,'Drone beyond the former 220px sound radius emits rotor audio');
+const farGain=Math.max(...droneSound.audio.gains.at(-1).gain.ramps.map(r=>r.value));
+assert(droneSound.audio.gains.at(-1).gain.ramps.length>10,'Blade-pass envelope pulses before fading');
+droneSound.advance(100);droneSound.t.updateGame();assert.equal(droneSound.audio.started,3,'Rotor sound respects its cadence');
 distantDrone.x=500;droneSound.advance(250);droneSound.t.updateGame();
-const rotorIndex=droneSound.audio.oscillators.findLastIndex(osc=>osc.frequency.value===180);
-assert(droneSound.audio.gains[rotorIndex+1].gain.value>farGain,'Drone audio grows louder toward the tower');
+const rotorIndex=droneSound.audio.oscillators.findLastIndex(osc=>osc.frequency.value===580);
+assert(Math.max(...droneSound.audio.gains[rotorIndex+1].gain.ramps.map(r=>r.value))>farGain,'Drone audio grows louder toward the tower');
 assert(droneSound.audio.pans.at(-1).pan.value>0,'Drone audio pans toward its position');
 console.log('PASS: distant drone rotor audio, cadence, approach volume and directional panning.');
 const sound=boot(false,true);sound.t.startGame();assert.equal(sound.audio.resumed,1);
 sound.elements.fireBtn.listeners.click();assert.equal(sound.audio.started,1);
 sound.t.playSound('drone',-.7);assert.equal(sound.audio.pans.at(-1).pan.value,-.7);
-assert.equal(sound.audio.oscillators.at(-1).type,'sawtooth');assert.equal(sound.audio.oscillators.at(-1).frequency.value,180,'Rotor buzz uses an audible pitch');
+assert.deepEqual(sound.audio.oscillators.slice(-3).map(osc=>osc.frequency.value),[145,153,580],'Detuned rotors and motor whine form three layers');
+assert.equal(sound.audio.oscillators.at(-1).type,'triangle');
 for(let i=0;i<30;i++)sound.t.playSound('shot');assert.equal(sound.audio.started,12);
 for(const osc of sound.audio.oscillators)osc.onended();assert.equal(sound.audio.disconnected,36);
 sound.t.playSound('armor');assert.equal(sound.audio.started,13);
