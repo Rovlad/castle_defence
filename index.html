@@ -435,7 +435,7 @@
                 pauseStarted: null,
                 settingsOpen: false,
                 settingsOpenedAt: 0,
-                lastFootstepTime: 0,
+                lastDroneSoundTime: 0,
                 firstSpawn: true,
                 health: 3,
                 damageFlash: 0,
@@ -767,12 +767,12 @@
                 osc.start(now); osc.stop(now+duration);
             } catch { /* Keep gameplay available if an audio node cannot be created. */ }
         }
-        function playSound(kind,pan=0) {
+        function playSound(kind,pan=0,strength=1) {
             if (kind === 'shot') tone(160,.09,'sawtooth',.28,0,45);
             else if (kind === 'hit') tone(230,.08,'triangle',.25,0,70);
             else if (kind === 'armor') tone(720,.13,'square',.09,0,310);
             else if (kind === 'breach') tone(100,.45,'sawtooth',.32,0,28);
-            else if (kind === 'step') tone(60,.055,'triangle',.16,pan,35);
+            else if (kind === 'drone') tone(180,.32,'sawtooth',.22*strength,pan,165);
             else if (kind === 'clear') { tone(440,.3,'sine',.16); tone(660,.4,'sine',.12); }
             else if (kind === 'upgrade') tone(500,.2,'sine',.14,0,900);
         }
@@ -882,35 +882,55 @@
             ground.fillStyle = '#3a4750'; ground.fillRect(-9,-4,18,2); ground.restore();
         }
         function drawCastle() {
-            ctx.save();
-            ctx.translate(centerX, centerY);
-            ctx.shadowColor = '#000'; ctx.shadowBlur = 18;
-            ctx.fillStyle = '#101e29'; ctx.beginPath(); ctx.arc(0, 0, 65, 0, Math.PI*2); ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = gameState.damageFlash > 0 ? '#8e4f48' : '#586c79';
-            ctx.strokeStyle = '#a3afb0'; ctx.lineWidth = 2;
-            ctx.fillRect(-42,-42,84,84); ctx.strokeRect(-42,-42,84,84);
-            for (const x of [-40,40]) for (const y of [-40,40]) {
-                ctx.fillRect(x-13,y-13,26,26); ctx.strokeRect(x-13,y-13,26,26);
-                ctx.fillStyle = '#263b4b'; ctx.fillRect(x-6,y-6,12,12);
-                ctx.fillStyle = gameState.damageFlash > 0 ? '#8e4f48' : '#586c79';
+            ctx.save(); ctx.translate(centerX, centerY);
+            ctx.shadowColor = '#000'; ctx.shadowBlur = 20;
+            const foundation = ctx.createRadialGradient(-15,-20,5,0,0,67);
+            foundation.addColorStop(0,'#566976'); foundation.addColorStop(1,'#182a36');
+            ctx.fillStyle = foundation; ctx.beginPath(); ctx.arc(0,0,65,0,Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0; ctx.strokeStyle = '#82949e'; ctx.lineWidth = 2; ctx.stroke();
+            // Stone platform, beveled walls and staggered masonry joints.
+            const stone = ctx.createRadialGradient(-28,-30,4,15,20,90);
+            stone.addColorStop(0,gameState.damageFlash>0?'#bb7967':'#a1b0b5');
+            stone.addColorStop(1,gameState.damageFlash>0?'#683e3a':'#425766');
+            ctx.fillStyle = stone; ctx.fillRect(-44,-44,88,88);
+            ctx.strokeStyle = '#243847'; ctx.lineWidth = 5; ctx.strokeRect(-44,-44,88,88);
+            ctx.strokeStyle = '#cad3cd'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-44,44); ctx.lineTo(-44,-44); ctx.lineTo(44,-44); ctx.stroke();
+            ctx.strokeStyle = '#354b59'; ctx.lineWidth = 1;
+            for(let row=0;row<5;row++){
+                const y=-42+row*17;ctx.beginPath();ctx.moveTo(-42,y);ctx.lineTo(42,y);ctx.stroke();
+                for(let x=-42+(row%2?9:0);x<42;x+=18){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,Math.min(42,y+17));ctx.stroke();}
             }
-            ctx.fillStyle = '#edc883'; ctx.fillRect(-27,-20,5,8); ctx.fillRect(22,-20,5,8);
-            if (gameState.health < 3) {
-                ctx.strokeStyle = '#17222d'; ctx.lineWidth = 3; ctx.beginPath();
-                ctx.moveTo(-40,20); ctx.lineTo(-26,9); ctx.lineTo(-29,-7); ctx.stroke();
+            // Four raised corner bastions with crenellated rims.
+            for(const x of [-40,40])for(const y of [-40,40]){
+                ctx.fillStyle='#263b49';ctx.fillRect(x-15,y-13,30,30);
+                ctx.fillStyle=stone;ctx.fillRect(x-15,y-16,30,28);
+                ctx.strokeStyle='#b5c1c1';ctx.lineWidth=1;ctx.strokeRect(x-15,y-16,30,28);
+                ctx.fillStyle='#344b5a';ctx.fillRect(x-8,y-9,16,14);
+                ctx.fillStyle='#afbbb9';
+                for(const offset of [-12,-2,8]){ctx.fillRect(x+offset,y-17,5,6);ctx.fillRect(x+offset,y+8,5,6);}
             }
-            if (gameState.health < 2) {
-                ctx.beginPath(); ctx.moveTo(42,17); ctx.lineTo(20,2); ctx.lineTo(31,-16); ctx.stroke();
+            for(const x of [-27,27]){
+                ctx.fillStyle='#142531';ctx.fillRect(x-4,-25,8,13);
+                ctx.fillStyle='#f2cc7e';ctx.shadowColor='#ffc16b';ctx.shadowBlur=10;ctx.fillRect(x-2,-22,4,8);ctx.shadowBlur=0;
             }
-            ctx.rotate(gameState.beamAngle);
-            ctx.fillStyle = '#b3bdba'; ctx.fillRect(0,-5,80,10);
-            ctx.fillStyle = '#273d4c'; ctx.fillRect(65,-7,15,14);
-            ctx.fillStyle = '#768b97'; ctx.beginPath(); ctx.arc(0,0,16,0,Math.PI*2); ctx.fill();
-            if (gameState.muzzleFlash > 0) {
-                ctx.fillStyle = '#ffe9a6'; ctx.shadowColor = '#ffbf55'; ctx.shadowBlur = 25;
-                ctx.beginPath(); ctx.moveTo(78,-9); ctx.lineTo(103,0); ctx.lineTo(78,9); ctx.fill();
-            }
+            if(gameState.health<3){ctx.strokeStyle='#17222d';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-40,20);ctx.lineTo(-26,9);ctx.lineTo(-29,-7);ctx.stroke();}
+            if(gameState.health<2){ctx.beginPath();ctx.moveTo(42,17);ctx.lineTo(20,2);ctx.lineTo(31,-16);ctx.stroke();}
+            // Fixed turret bearing with a rotating, recoiling cannon assembly.
+            ctx.fillStyle='#203542';ctx.beginPath();ctx.arc(0,0,27,0,Math.PI*2);ctx.fill();
+            ctx.strokeStyle='#b4bfc0';ctx.lineWidth=3;ctx.stroke();
+            for(let i=0;i<8;i++){const a=i*Math.PI/4;ctx.fillStyle='#d0bf8d';ctx.beginPath();ctx.arc(Math.cos(a)*22,Math.sin(a)*22,2,0,Math.PI*2);ctx.fill();}
+            ctx.rotate(gameState.beamAngle);ctx.translate(-Math.min(1,gameState.muzzleFlash/.1)*5,0);
+            ctx.fillStyle='#263b49';ctx.fillRect(-15,-14,39,28);
+            ctx.strokeStyle='#8ca1ab';ctx.lineWidth=2;ctx.strokeRect(-15,-14,39,28);
+            ctx.fillStyle='#728994';ctx.fillRect(-10,-10,28,6);
+            ctx.fillStyle='#8c9fa5';ctx.fillRect(15,-6,63,12);
+            ctx.fillStyle='#ced6cf';ctx.fillRect(15,-5,63,3);
+            for(let x=30;x<66;x+=8){ctx.fillStyle='#3c5361';ctx.fillRect(x,-8,3,16);}
+            ctx.fillStyle='#405867';ctx.fillRect(70,-10,12,20);
+            ctx.fillStyle='#101f2a';ctx.fillRect(78,-6,4,12);
+            ctx.fillStyle='#d6c38b';ctx.fillRect(-4,-3,10,6);
+            if(gameState.muzzleFlash>0){ctx.fillStyle='#ffe9a6';ctx.shadowColor='#ffbf55';ctx.shadowBlur=25;ctx.beginPath();ctx.moveTo(82,-9);ctx.lineTo(108,0);ctx.lineTo(82,9);ctx.fill();}
             ctx.restore();
         }
         function drawBeam() {
@@ -1076,9 +1096,9 @@
                 const d = Math.hypot(m.x-centerX,m.y-centerY);
                 return !best || d < best.d ? {m,d} : best;
             }, null);
-            if (nearest && nearest.d < 220 && now-gameState.lastFootstepTime > Math.max(220,nearest.d*3)) {
-                playSound('step',Math.max(-1,Math.min(1,(nearest.m.x-centerX)/gameRadius)));
-                gameState.lastFootstepTime = now;
+            if (nearest && nearest.d < gameRadius && now-gameState.lastDroneSoundTime > 240) {
+                playSound('drone',Math.max(-1,Math.min(1,(nearest.m.x-centerX)/gameRadius)),.35+.65*(1-nearest.d/gameRadius));
+                gameState.lastDroneSoundTime = now;
             }
             if (gameState.waveSpawned === gameState.waveSize && gameState.monsters.length === 0) finishWave();
         }
