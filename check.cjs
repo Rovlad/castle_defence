@@ -200,9 +200,21 @@ for(const kind of ['beam','rotation','ammo']) {
         kind==='beam'?Math.PI/2:kind==='rotation'?5.4:6);
 }
 // Audio is unlocked by start, bounded, panned, muted, persisted and suspended while hidden.
+const droneSound=boot(false,true);droneSound.t.startGame();
+const distantDrone=new droneSound.t.Monster();distantDrone.x=700;distantDrone.y=400;distantDrone.speed=0;
+droneSound.t.state.monsters=[distantDrone];droneSound.t.state.waveSpawned=1;
+droneSound.advance(250);droneSound.t.updateGame();
+assert.equal(droneSound.audio.started,1,'Drone beyond the former 220px sound radius emits rotor audio');
+const farGain=droneSound.audio.gains.at(-1).gain.value;
+droneSound.advance(100);droneSound.t.updateGame();assert.equal(droneSound.audio.started,1,'Rotor sound respects its cadence');
+distantDrone.x=500;droneSound.advance(250);droneSound.t.updateGame();
+assert(droneSound.audio.gains.at(-1).gain.value>farGain,'Drone audio grows louder toward the tower');
+assert(droneSound.audio.pans.at(-1).pan.value>0,'Drone audio pans toward its position');
+console.log('PASS: distant drone rotor audio, cadence, approach volume and directional panning.');
 const sound=boot(false,true);sound.t.startGame();assert.equal(sound.audio.resumed,1);
 sound.elements.fireBtn.listeners.click();assert.equal(sound.audio.started,1);
-sound.t.playSound('step',-.7);assert.equal(sound.audio.pans.at(-1).pan.value,-.7);
+sound.t.playSound('drone',-.7);assert.equal(sound.audio.pans.at(-1).pan.value,-.7);
+assert.equal(sound.audio.oscillators.at(-1).type,'sawtooth');assert.equal(sound.audio.oscillators.at(-1).frequency.value,180,'Rotor buzz uses an audible pitch');
 for(let i=0;i<30;i++)sound.t.playSound('shot');assert.equal(sound.audio.started,12);
 for(const osc of sound.audio.oscillators)osc.onended();assert.equal(sound.audio.disconnected,36);
 sound.t.playSound('armor');assert.equal(sound.audio.started,13);
@@ -211,7 +223,7 @@ assert.equal(sound.audio.gains[0].gain.value,0);assert.equal(storage.get('castle
 assert.equal(boot().elements.soundBtn.textContent,'Sound off');
 sound.elements.soundBtn.listeners.click();assert.equal(sound.audio.gains[0].gain.value,.18);
 sound.sandbox.document.hidden=true;sound.events.visibilitychange();assert.equal(sound.audio.suspended,1);
-sound.t.playSound('step');assert.equal(sound.audio.started,13);
+sound.t.playSound('drone');assert.equal(sound.audio.started,13);
 sound.sandbox.document.hidden=false;sound.events.visibilitychange();assert.equal(sound.audio.resumed,4);
 assert.equal(sound.sandbox.navigator.audioSession.type,'playback','Use the media session instead of iOS ambient audio');
 const interrupted=sound.audio.contexts[0];interrupted.state='interrupted';interrupted.onstatechange();

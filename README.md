@@ -15,7 +15,7 @@ Open index.html in a browser, or run `python3 -m http.server 8000` and visit htt
 - Between waves, recover one health and choose one upgrade: wider searchlight, faster turret or an additional bullet slot.
 - After the four-second resupply break, tap **Start next wave**. There is no automatic countdown into combat. Keyboard 1/2/3 choose upgrades.
 - Record your score after defeat (Y), play again, or return to the start screen (N).
-- Use **Sound on/off** to mute. Sound is synthesized locally and starts after a user gesture. Footsteps pan toward approaching threats. The mute preference survives reloads; play still works when audio is unavailable.
+- Use **Sound on/off** to mute. Sound is synthesized locally and starts after a user gesture. A synthesized rotor buzz starts as drones enter the battlefield, pans toward the nearest threat and grows louder as it approaches. The mute preference survives reloads; play still works when audio is unavailable.
 
 Wave 1 has five enemies; later waves add two up to 25, with shorter spawn intervals and faster movement. Armored enemies arrive from wave 3 and heavies from wave 5. Scout, armored and heavy drones take one, two and three hits respectively. Scouts and armored drones have four spinning rotors; heavies have six. The searchlight reveals enemies but does not damage them; enemies fade shortly after leaving the beam.
 
@@ -23,7 +23,7 @@ Beam upgrades add 5° up to 90°, the turret can be upgraded six times, and ammu
 
 ## Scores and mobile use
 
-The circular battlefield scales up to 960px wide on desktop screens of at least 900px, keeping the same combat coordinates and timing. The layout scales to desktop and mobile, with touch controls and health/ammunition indicators. Below the battlefield, a wave panel shows progress, enemies remaining, elapsed wave time and the next-enemy countdown. Waves end when all enemies are resolved, so there is no fixed countdown to the wave end. High scores appear on the start screen. Terrain, ruins, mist, searchlight, trails and particles are drawn locally on canvas.
+The circular battlefield scales up to 960px wide on desktop screens of at least 900px, keeping the same combat coordinates and timing. The layout scales to desktop and mobile, with touch controls and health/ammunition indicators. Below the battlefield, a wave panel shows progress, enemies remaining, elapsed wave time and the next-enemy countdown. Waves end when all enemies are resolved, so there is no fixed countdown to the wave end. High scores appear on the start screen. Terrain, ruins, mist, searchlight, trails and particles are drawn locally on canvas. The tower has stonework, battlements and lit windows; its cannon has cooling rings, a turret bearing and visible recoil.
 
 Scores are stored in this browser, not shared across devices. Blocked storage falls back to session-only scores. Survival time stops at the final breach and excludes resupply and hidden-page pauses. New wave-mode scores rank ahead of retained older scores, which are labeled Legacy level because the modes are not directly comparable. All upgrades reset for a new run.
 
