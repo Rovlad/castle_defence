@@ -303,11 +303,20 @@
         #settingsDialog #soundStatus { font-size: 14px !important; color: #a9bdcf; margin: 14px 0 !important; }
         #closeSettingsBtn { width: 100%; margin-top: 8px; }
         #startSettingsBtn { background: transparent; box-shadow: none; font-size: 14px; margin-top: 12px; min-height: 44px; }
+        #battlefield{grid-column:1/-1;grid-row:2;position:relative;min-width:0}
+        #radarPanel{position:absolute;right:12px;top:12px;background:#081622e6;border:1px solid #557183;border-radius:10px;padding:8px;width:128px;pointer-events:none;font-size:11px;letter-spacing:1px;color:#c9d9e2}
+        #radarCanvas{display:block;width:100%;height:auto}#radarCount{display:block;letter-spacing:0;color:#e4bb8b}
+        #breachWarning{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);max-width:80%;padding:8px 14px;border:1px solid #c87b66;border-radius:8px;background:#371b1de8;color:#ffe0b8;font-weight:bold;text-align:center;font-size:13px;pointer-events:none}
+        #shopBalance{color:#f0d497;font-weight:bold}#upgradeChoices span{display:block;color:#efd397;font-size:13px;margin-top:6px}
+        @media(max-width:480px){#radarPanel{width:80px;right:8px;top:8px;padding:5px;font-size:9px}#breachWarning{font-size:11px;bottom:8px;padding:6px 8px}}
+        #upgradePanel{align-items:flex-start}.upgrade-card{margin:auto}
     </style>
 </head>
 <body>
     <div id="gameContainer">
-        <canvas id="gameCanvas" width="800" height="800"></canvas>
+        <div id="battlefield"><canvas id="gameCanvas" width="800" height="800"></canvas>
+            <aside id="radarPanel" aria-label="Drone radar"><span>RADAR</span><canvas id="radarCanvas" width="128" height="128" role="img" aria-label="Drone radar: north up, castle at centre"></canvas><small id="radarCount">0 targets</small></aside>
+            <div id="breachWarning" role="status" hidden></div></div>
         <header id="statusBar" aria-label="Game status">
             <div class="status-primary">
                 <strong>Wave <span id="level">1</span></strong>
@@ -316,7 +325,7 @@
             </div>
             <div class="status-secondary">
                 <span>Threats <span id="attacking">0</span></span>
-                <span>Kills <span id="kills">0</span></span>
+                <span>Kills <span id="kills">0</span> · Points <span id="points">0</span></span>
             </div>
             <button id="settingsBtn" aria-label="Settings" title="Settings">⚙</button>
         </header>
@@ -358,11 +367,11 @@
             <div class="upgrade-card">
                 <h2 id="upgradeTitle">Wave complete</h2>
                 <p id="breakSummary"></p>
-                <p>Choose one upgrade for the rest of this run.</p>
+                <p>Buy upgrades with earned points, or save them for later.</p><p id="shopBalance"></p>
                 <div id="upgradeChoices">
-                    <button id="beamUpgradeBtn">Wider searchlight<small>+5° visibility · maximum 90°</small></button>
-                    <button id="rotationUpgradeBtn">Faster turret<small>Turn faster to track approaching enemies · up to 6 upgrades</small></button>
-                    <button id="ammoUpgradeBtn">Extra ammunition<small>+1 bullet slot · maximum 6</small></button>
+                    <button id="beamUpgradeBtn">Wider searchlight<small>+5° visibility · maximum 90°</small><span id="beamPrice"></span></button>
+                    <button id="rotationUpgradeBtn">Faster turret<small>Turn faster to track approaching enemies · up to 6 upgrades</small><span id="rotationPrice"></span></button>
+                    <button id="ammoUpgradeBtn">Extra ammunition<small>+1 bullet slot · maximum 6</small><span id="ammoPrice"></span></button>
                 </div>
                 <p id="breakStatus" role="status" aria-live="polite"></p>
                 <button id="nextWaveBtn" disabled>Start next wave</button>
@@ -429,7 +438,9 @@
                 waveElapsed: 0,
                 waveSpawned: 0,
                 breakStartTime: 0,
-                upgradeChosen: false,
+                points: 0,
+                earnedPoints: 0,
+                lastWarningTime: 0,
                 rotationSpeed: 3,
                 bulletLimit: 3,
                 pauseStarted: null,
@@ -521,6 +532,7 @@
                 
                 // For hit animation
                 this.hitFlash = 0;
+                this.smokeElapsed = 0;
                 this.rotorPhase = Math.random() * Math.PI;
             }
             
@@ -532,6 +544,11 @@
                     this.hitFlash -= deltaTime * 60;
                 }
 
+                this.smokeElapsed += deltaTime;
+                if(this.hp < this.maxHp && this.reveal > .3 && this.smokeElapsed >= .18){
+                    gameState.particles.push({x:this.x,y:this.y,vx:-8,vy:-12,life:.7,color:'#66747d',kind:'smoke',size:3});
+                    gameState.particles=gameState.particles.slice(-160);this.smokeElapsed=0;
+                }
                 const dx = centerX - this.x;
                 const dy = centerY - this.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
@@ -623,7 +640,7 @@
                     ctx.strokeStyle = '#d5e3e9'; ctx.lineWidth = 2;
                     ctx.beginPath(); ctx.moveTo(x - dx, y - dy); ctx.lineTo(x + dx, y + dy); ctx.stroke();
                 }
-                ctx.fillStyle = this.hitFlash > 0 ? '#fff4d6' : color;
+                ctx.fillStyle = this.hitFlash > 0 ? '#fff4d6' : this.hp < this.maxHp ? '#4b5960' : color;
                 ctx.strokeStyle = '#1a202b'; ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.moveTo(r * .58, 0); ctx.lineTo(r * .25, -r * .36);
@@ -772,6 +789,7 @@
             else if (kind === 'hit') tone(230,.08,'triangle',.25,0,70);
             else if (kind === 'armor') tone(720,.13,'square',.09,0,310);
             else if (kind === 'breach') tone(100,.45,'sawtooth',.32,0,28);
+            else if (kind === 'warning') tone(680,.12,'triangle',.25,pan,420);
             else if (kind === 'drone') tone(180,.32,'sawtooth',.22*strength,pan,165);
             else if (kind === 'clear') { tone(440,.3,'sine',.16); tone(660,.4,'sine',.12); }
             else if (kind === 'upgrade') tone(500,.2,'sine',.14,0,900);
@@ -795,68 +813,52 @@
         });
         updateSoundButton();
 
+        const SHOP = {
+            beam:{cost:30,button:'beamUpgradeBtn',price:'beamPrice'},
+            rotation:{cost:40,button:'rotationUpgradeBtn',price:'rotationPrice'},
+            ammo:{cost:50,button:'ammoUpgradeBtn',price:'ammoPrice'}
+        };
+        function canUpgrade(kind){return kind==='beam'?gameState.beamWidth<Math.PI/2-.001:kind==='rotation'?gameState.rotationSpeed<5.4-.001:kind==='ammo'?gameState.bulletLimit<6:false;}
+        function awardPoints(points){gameState.points+=points;gameState.earnedPoints+=points;}
         function finishWave() {
-            if (gameState.phase !== 'combat' || gameState.blinkingPhase || gameState.gameOver) return;
-            gameState.phase = 'intermission';
-            gameState.breakStartTime = Date.now();
-            gameState.upgradeChosen = false;
-            gameState.bullets = []; gameState.bouncingBullets = [];
-            clearKeys();
-            const repaired = gameState.health < 3;
-            gameState.health = Math.min(3,gameState.health+1);
-            document.getElementById('upgradeTitle').textContent = `Wave ${gameState.level} cleared`;
-            document.getElementById('breakSummary').textContent = repaired ? 'Resupply: one castle health restored.' : 'Resupply: castle at full health.';
-            document.getElementById('beamUpgradeBtn').disabled = gameState.beamWidth >= Math.PI/2-.001;
-            document.getElementById('rotationUpgradeBtn').disabled = gameState.rotationSpeed >= 5.4-.001;
-            document.getElementById('ammoUpgradeBtn').disabled = gameState.bulletLimit >= 6;
-            if (gameState.beamWidth >= Math.PI/2-.001 && gameState.rotationSpeed >= 5.4-.001 && gameState.bulletLimit >= 6) {
-                gameState.upgradeChosen = true;
-                document.getElementById('breakSummary').textContent += ' All upgrades are at maximum.';
+            if(gameState.phase!=='combat'||gameState.blinkingPhase||gameState.gameOver)return;
+            gameState.phase='intermission';gameState.breakStartTime=Date.now();awardPoints(20);
+            gameState.bullets=[];gameState.bouncingBullets=[];clearKeys();
+            const repaired=gameState.health<3;gameState.health=Math.min(3,gameState.health+1);
+            document.getElementById('upgradeTitle').textContent=`Wave ${gameState.level} cleared`;
+            document.getElementById('breakSummary').textContent=(repaired?'One health restored.':'Castle at full health.')+' +20 points for clearing the wave.';
+            document.getElementById('upgradePanel').style.display='flex';updateBreak();updateHud();playSound('clear');
+            const available=Object.values(SHOP).find(item=>!document.getElementById(item.button).disabled);
+            document.getElementById(available?available.button:'upgradePanel').focus();
+        }
+        function updateBreak(){
+            const remaining=Math.max(0,Math.ceil(4-(Date.now()-gameState.breakStartTime)/1000));
+            const button=document.getElementById('nextWaveBtn'),newlyReady=remaining===0&&button.disabled;
+            button.disabled=remaining>0;if(newlyReady)button.focus();
+            document.getElementById('breakStatus').textContent=remaining?`Resupply: ${remaining}s · Purchases are optional`:'Ready when you are. Buy upgrades or save points.';
+            document.getElementById('shopBalance').textContent=`Available: ${gameState.points} points`;
+            for(const [kind,item] of Object.entries(SHOP)){
+                const maxed=!canUpgrade(kind),poor=gameState.points<item.cost;
+                document.getElementById(item.button).disabled=maxed||poor;
+                document.getElementById(item.price).textContent=maxed?'MAXED':`${item.cost} points${poor?' · Not enough points':''}`;
             }
-            document.getElementById('upgradePanel').style.display = 'flex';
-            updateBreak(); updateHud(); playSound('clear');
-            const available = ['beamUpgradeBtn','rotationUpgradeBtn','ammoUpgradeBtn'].find(id => !document.getElementById(id).disabled);
-            document.getElementById(available || 'upgradePanel').focus();
         }
-        function updateBreak() {
-            const remaining = Math.max(0,Math.ceil(4-(Date.now()-gameState.breakStartTime)/1000));
-            const ready = remaining === 0 && gameState.upgradeChosen;
-            const nextButton = document.getElementById('nextWaveBtn');
-            const newlyReady = ready && nextButton.disabled;
-            nextButton.disabled = !ready;
-            if (newlyReady) nextButton.focus();
-            document.getElementById('breakStatus').textContent = remaining ?
-                `Resupply: ${remaining}s${gameState.upgradeChosen ? ' · Upgrade selected' : ' · Choose an upgrade'}` :
-                gameState.upgradeChosen ? 'Ready when you are.' : 'Choose an upgrade to continue.';
+        function chooseUpgrade(kind){
+            if(gameState.phase!=='intermission'||!SHOP[kind]||!canUpgrade(kind)||gameState.points<SHOP[kind].cost)return;
+            if(kind==='beam')gameState.beamWidth=Math.min(Math.PI/2,gameState.beamWidth+Math.PI/36);
+            if(kind==='rotation')gameState.rotationSpeed=Math.min(5.4,gameState.rotationSpeed+.4);
+            if(kind==='ammo')gameState.bulletLimit++;
+            gameState.points-=SHOP[kind].cost;updateBreak();updateHud();playSound('upgrade');
+            document.getElementById(document.getElementById('nextWaveBtn').disabled?'upgradePanel':'nextWaveBtn').focus();
         }
-        function chooseUpgrade(kind) {
-            if (gameState.phase !== 'intermission' || gameState.upgradeChosen) return;
-            if (kind === 'beam' && gameState.beamWidth < Math.PI/2-.001) gameState.beamWidth = Math.min(Math.PI/2,gameState.beamWidth+Math.PI/36);
-            else if (kind === 'rotation' && gameState.rotationSpeed < 5.4-.001) gameState.rotationSpeed = Math.min(5.4,gameState.rotationSpeed+.4);
-            else if (kind === 'ammo' && gameState.bulletLimit < 6) gameState.bulletLimit++;
-            else return;
-            gameState.upgradeChosen = true;
-            for (const id of ['beamUpgradeBtn','rotationUpgradeBtn','ammoUpgradeBtn']) document.getElementById(id).disabled = true;
-            document.getElementById('breakSummary').textContent += ` ${kind === 'beam' ? 'Wider searchlight' : kind === 'rotation' ? 'Faster turret' : 'Extra ammunition'} equipped.`;
-            updateBreak(); updateHud(); playSound('upgrade');
-            document.getElementById('nextWaveBtn').disabled ? document.getElementById('upgradePanel').focus() : document.getElementById('nextWaveBtn').focus();
-        }
-        function nextWave() {
-            if (gameState.phase !== 'intermission' || !gameState.upgradeChosen || Date.now()-gameState.breakStartTime < 4000) return;
-            const now = Date.now();
-            gameState.gameStartTime += now-gameState.breakStartTime; // Score measures combat time only.
-            gameState.level++;
-            gameState.waveStartTime = now;
-            gameState.waveElapsed = 0;
-            gameState.waveSize = Math.min(25,5+(gameState.level-1)*2);
-            gameState.waveSpawned = 0;
-            gameState.monsterSpawnInterval = Math.max(.8,2.6-(gameState.level-1)*.15);
-            gameState.lastSpawnTime = gameState.lastUpdateTime = now;
-            gameState.firstSpawn = true;
-            gameState.phase = 'combat';
-            clearKeys(); unlockAudio();
-            document.getElementById('upgradePanel').style.display = 'none';
-            updateHud(); document.getElementById('fireBtn').focus();
+        function nextWave(){
+            if(gameState.phase!=='intermission'||Date.now()-gameState.breakStartTime<4000)return;
+            const now=Date.now();gameState.gameStartTime+=now-gameState.breakStartTime;
+            gameState.level++;gameState.waveStartTime=now;gameState.waveElapsed=0;
+            gameState.waveSize=Math.min(25,5+(gameState.level-1)*2);gameState.waveSpawned=0;
+            gameState.monsterSpawnInterval=Math.max(.8,2.6-(gameState.level-1)*.15);
+            gameState.lastSpawnTime=gameState.lastUpdateTime=now;gameState.firstSpawn=true;gameState.phase='combat';
+            clearKeys();unlockAudio();document.getElementById('upgradePanel').style.display='none';updateHud();document.getElementById('fireBtn').focus();
         }
         document.getElementById('beamUpgradeBtn').addEventListener('click', () => chooseUpgrade('beam'));
         document.getElementById('rotationUpgradeBtn').addEventListener('click', () => chooseUpgrade('rotation'));
@@ -958,11 +960,51 @@
             }
             gameState.particles = gameState.particles.slice(-160);
         }
+        function explodeDrone(drone){
+            spawnParticles(drone.x,drone.y,'#ffc572',18);
+            for(let i=0;i<12;i++){
+                const angle=Math.random()*Math.PI*2,speed=20+Math.random()*65;
+                gameState.particles.push({x:drone.x,y:drone.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:i<8?.8:1.1,color:i<8?'#a3b6c0':'#56636c',kind:i<8?'debris':'smoke',size:i<8?4:6});
+            }
+            gameState.particles=gameState.particles.slice(-160);
+        }
+        function breachThreat(){
+            if(!gameState.gameStarted||gameState.phase!=='combat'||gameState.gameOver||gameState.blinkingPhase)return null;
+            let threat=null;
+            for(const drone of gameState.monsters){
+                const distance=Math.hypot(drone.x-centerX,drone.y-centerY);
+                if(distance>180)continue;
+                const eta=Math.max(0,distance-castleRadius-drone.radius)/Math.max(.01,drone.speed*60);
+                if(!threat||eta<threat.eta){
+                    let bearing=Math.atan2(drone.y-centerY,drone.x-centerX)-gameState.beamAngle;
+                    bearing=Math.atan2(Math.sin(bearing),Math.cos(bearing));threat={drone,eta,bearing};
+                }
+            }
+            return threat;
+        }
+        const radarContext=document.getElementById('radarCanvas').getContext('2d');
+        function drawRadar(){
+            if(!radarContext)return;
+            const r=radarContext,c=64,scale=52/gameRadius;
+            r.clearRect(0,0,128,128);r.fillStyle='#091522';r.beginPath();r.arc(c,c,55,0,Math.PI*2);r.fill();
+            r.strokeStyle='#4c687a';r.lineWidth=1;
+            for(const radius of [27,52]){r.beginPath();r.arc(c,c,radius,0,Math.PI*2);r.stroke();}
+            r.fillStyle='#dfc47b30';r.beginPath();r.moveTo(c,c);r.arc(c,c,52,gameState.beamAngle-gameState.beamWidth/2,gameState.beamAngle+gameState.beamWidth/2);r.closePath();r.fill();
+            r.fillStyle='#edd69b';r.fillRect(c-3,c-3,6,6);
+            const urgent=breachThreat();
+            for(const drone of gameState.monsters){
+                const x=c+(drone.x-centerX)*scale,y=c+(drone.y-centerY)*scale;
+                r.fillStyle='#ee947d';r.strokeStyle='#ee947d';r.beginPath();r.arc(x,y,drone.monsterType==='heavy'?4:3,0,Math.PI*2);
+                if(drone.monsterType==='armored')r.stroke();else r.fill();
+                if(urgent&&urgent.drone===drone){r.strokeStyle='#ffe0a0';r.lineWidth=2;r.beginPath();r.arc(x,y,6+Math.sin(gameState.waveElapsed*6),0,Math.PI*2);r.stroke();r.lineWidth=1;}
+            }
+            r.fillStyle='#b0c7d5';r.font='9px Arial';r.fillText('N',61,8);
+        }
         function updateEffects(dt) {
             gameState.muzzleFlash = Math.max(0,gameState.muzzleFlash-dt);
             gameState.damageFlash = Math.max(0,gameState.damageFlash-dt);
             gameState.particles = gameState.particles.filter(p => {
-                p.life -= dt; p.x += p.vx*dt; p.y += p.vy*dt; return p.life > 0;
+                p.life -= dt; p.x += p.vx*dt; p.y += p.vy*dt;if(p.kind==='smoke')p.size+=dt*8; return p.life > 0;
             });
         }
         function formatTime(seconds) {
@@ -970,6 +1012,13 @@
             return `${Math.floor(whole/60)}:${String(whole%60).padStart(2,'0')}`;
         }
         function updateHud() {
+            document.getElementById('points').textContent=gameState.points;
+            document.getElementById('radarCount').textContent=`${gameState.monsters.length} targets`;
+            document.getElementById('radarCanvas').setAttribute('aria-label',`Radar: ${gameState.monsters.length} drones. North up; castle at centre.`);
+            const threat=breachThreat(),warning=document.getElementById('breachWarning');warning.hidden=!threat;
+            if(threat){const side=Math.abs(threat.bearing)>Math.PI*.65?'behind':threat.bearing<-.3?'left':threat.bearing>.3?'right':'ahead';
+                const message=`BREACH WARNING · Drone ${side}`;if(warning.textContent!==message)warning.textContent=message;}
+
             document.getElementById('health').textContent = `${gameState.health} / 3`;
             document.getElementById('ammo').textContent = `${gameState.bulletLimit-gameState.bullets.length} / ${gameState.bulletLimit}`;
             document.getElementById('level').textContent = gameState.level;
@@ -1071,12 +1120,12 @@
                         // Damage the monster
                         monster.hp--;
                         playSound(monster.hp > 0 ? 'armor' : 'hit');
-                        spawnParticles(monster.x,monster.y,monster.hp > 0 ? '#eed6a5' : '#c9836f',monster.hp > 0 ? 7 : 15);
+                        if(monster.hp>0)spawnParticles(monster.x,monster.y,'#eed6a5',7);else explodeDrone(monster);
                         
                         if (monster.hp <= 0) {
                             // Monster killed
                             gameState.monsters.splice(j, 1);
-                            gameState.kills++;
+                            gameState.kills++;awardPoints(monster.monsterType==='heavy'?30:monster.monsterType==='armored'?20:10);
                         } else {
                             // Monster hit but not killed - bullet bounces off
                             monster.hitFlash = 5; // Flash white for ~5 frames at 60fps
@@ -1100,6 +1149,8 @@
                 playSound('drone',Math.max(-1,Math.min(1,(nearest.m.x-centerX)/gameRadius)),.35+.65*(1-nearest.d/gameRadius));
                 gameState.lastDroneSoundTime = now;
             }
+            const threat=breachThreat();
+            if(threat&&now-gameState.lastWarningTime>1500){playSound('warning',Math.sin(threat.bearing));gameState.lastWarningTime=now;}
             if (gameState.waveSpawned === gameState.waveSize && gameState.monsters.length === 0) finishWave();
         }
 
@@ -1128,7 +1179,8 @@
             
             for (const p of gameState.particles) {
                 ctx.globalAlpha = Math.min(1,p.life*3); ctx.fillStyle = p.color;
-                ctx.fillRect(p.x,p.y,3,3);
+                if(p.kind==='smoke'){ctx.globalAlpha=Math.min(.35,p.life*.35);ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();}
+                else ctx.fillRect(p.x,p.y,p.kind==='debris'?p.size:3,p.kind==='debris'?2:3);
             }
             ctx.globalAlpha = 1;
             // Faint stationary mist ribbons leave enemy visibility controlled by the beam.
@@ -1136,7 +1188,7 @@
             for (let i=0;i<4;i++) {
                 ctx.beginPath(); ctx.arc(400,400,145+i*53,.3+i,1.6+i); ctx.stroke();
             }
-            drawCastle();
+            drawCastle();drawRadar();
             if (gameState.damageFlash > 0) {
                 ctx.strokeStyle = `rgba(235,121,93,${gameState.damageFlash*.7})`;
                 ctx.lineWidth = 14; ctx.beginPath(); ctx.arc(400,400,380,0,Math.PI*2); ctx.stroke();
@@ -1298,7 +1350,7 @@
             clearKeys();
             document.getElementById('gameOver').style.display = 'none';
             document.getElementById('scoreDisplay').textContent =
-                `Wave ${gameState.level} • ${gameState.kills} kills • ${gameState.survivalTime}s survived`;
+                `Wave ${gameState.level} • ${gameState.kills} kills • ${gameState.earnedPoints} points earned • ${gameState.survivalTime}s survived`;
             document.getElementById('nameEntry').style.display = 'block';
             document.getElementById('playerName').focus();
         }

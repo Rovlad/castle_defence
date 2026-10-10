@@ -25,6 +25,7 @@ function boot(blockStorage = false, withAudio = false) {
     for (const [, id] of html.matchAll(/id="([^"]+)"/g)) elements[id] = id === 'playerName' ? new Input() : /Btn$/.test(id) ? new Button() : new Element();
     elements.gameCanvas.width = elements.gameCanvas.height = 800;
     elements.gameCanvas.getContext = () => ctx;
+    elements.radarCanvas.getContext = () => ctx;
     const sandbox = {console: {log(){},error(){}}, Math, Date: class extends Date {static now(){ return now; }},
         HTMLInputElement: Input, HTMLButtonElement: Button, alert(){}, requestAnimationFrame(){},
         localStorage: {getItem(k){if(blockStorage)throw Error();return storage.get(k)||null;},setItem(k,v){if(blockStorage)throw Error();storage.set(k,v);}},
@@ -46,7 +47,7 @@ function boot(blockStorage = false, withAudio = false) {
         };
     }
     vm.createContext(sandbox);
-    const instrumented = script.replace('        // Start game loop', '        window.test = {get state(){return gameState;}, keys, startGame, updateGame, saveScore, resetToStartScreen, showNameEntry, Monster, finishWave, chooseUpgrade, nextWave, updateBreak, playSound};\n        // Start game loop');
+    const instrumented = script.replace('        // Start game loop', '        window.test = {get state(){return gameState;}, keys, startGame, updateGame, saveScore, resetToStartScreen, showNameEntry, Monster, finishWave, chooseUpgrade, nextWave, updateBreak, playSound, breachThreat, explodeDrone, updateEffects, drawRadar};\n        // Start game loop');
     vm.runInContext(instrumented, sandbox);
     events.DOMContentLoaded();
     return {t:sandbox.window.test, elements, events, sandbox, audio, advance(ms){now+=ms;}, key(code,target){let prevented=false;events.keydown({code,target,repeat:false,preventDefault(){prevented=true;}});return prevented;},
@@ -134,7 +135,7 @@ assert(combat.t.state.muzzleFlash > 0);
 combat.advance(16);combat.t.updateGame();
 assert.equal(combat.t.state.kills,1);assert.equal(combat.t.state.monsters.length,0);
 assert.equal(combat.t.state.bullets.length,0);assert(combat.t.state.particles.length>0);
-for(let i=0;i<30;i++){combat.advance(33);combat.t.updateGame();}
+for(let i=0;i<40;i++){combat.advance(33);combat.t.updateGame();}
 assert.equal(combat.t.state.particles.length,0);
 const waves = boot(); waves.t.startGame();
 for(let i=0;i<5;i++) {
@@ -155,8 +156,9 @@ const clearedAt = waves.sandbox.Date.now();
 const combatTime = clearedAt-waves.t.state.gameStartTime;
 waves.elements.fireBtn.listeners.click();assert.equal(waves.t.state.bullets.length,0);
 waves.t.nextWave();assert.equal(waves.t.state.level,1);
-waves.t.chooseUpgrade('ammo');assert.equal(waves.t.state.bulletLimit,4);
-const beamBefore=waves.t.state.beamWidth;waves.t.chooseUpgrade('beam');assert.equal(waves.t.state.beamWidth,beamBefore);
+assert.equal(waves.t.state.points,20);waves.t.chooseUpgrade('ammo');assert.equal(waves.t.state.bulletLimit,3,'Unaffordable upgrade rejected');
+waves.t.state.points=80;waves.t.chooseUpgrade('ammo');assert.equal(waves.t.state.bulletLimit,4);assert.equal(waves.t.state.points,30);
+const beamBefore=waves.t.state.beamWidth;waves.t.chooseUpgrade('beam');assert(waves.t.state.beamWidth>beamBefore,'Multiple affordable purchases allowed');assert.equal(waves.t.state.points,0);
 waves.t.nextWave();assert.equal(waves.t.state.phase,'intermission');
 waves.advance(4200);waves.t.updateGame();assert.equal(waves.elements.nextWaveBtn.disabled,false);
 assert.equal(waves.elements.waveTime.textContent,displayedWaveTime,'Wave timer freezes in resupply');
@@ -186,19 +188,51 @@ waves.t.updateGame();assert.equal(waves.elements.waveTime.textContent,'0:00','Wa
 assert.equal(waves.sandbox.Date.now()-waves.t.state.gameStartTime,combatTime);
 // Upgrade maxima do not soft-lock a completed run.
 waves.t.state.beamWidth=Math.PI/2;waves.t.state.rotationSpeed=5.4;waves.t.state.bulletLimit=6;
-waves.t.finishWave();assert(waves.t.state.upgradeChosen);
+waves.t.finishWave();assert.equal(waves.elements.beamUpgradeBtn.disabled,true);
 waves.advance(4100);waves.t.nextWave();assert.equal(waves.t.state.level,3);
 waves.t.resetToStartScreen();assert.equal(waves.t.state.bulletLimit,3);assert.equal(waves.t.state.rotationSpeed,3);
 assert.equal(waves.t.state.phase,'combat');assert.equal(waves.t.state.waveSpawned,0);
-// Each upgrade is bounded and can only be applied once per break.
+// Each upgrade is bounded and can be bought up to its cap.
 for(const kind of ['beam','rotation','ammo']) {
-    const u=boot();u.t.startGame();u.t.finishWave();
+    const u=boot();u.t.startGame();u.t.finishWave();u.t.state.points=1000;
     u.t.state.beamWidth=Math.PI/2-Math.PI/36;
     u.t.state.rotationSpeed=5.0;u.t.state.bulletLimit=5;
     u.t.chooseUpgrade(kind);
     assert.equal(kind==='beam'?u.t.state.beamWidth:kind==='rotation'?u.t.state.rotationSpeed:u.t.state.bulletLimit,
         kind==='beam'?Math.PI/2:kind==='rotation'?5.4:6);
 }
+assert.equal(combat.t.state.points,10,'Scout kill awards points');
+assert.equal(combat.t.state.earnedPoints,10,'Earned total excludes spending');
+for(const [kind,reward] of [['armored',20],['heavy',30]]){
+    const tier=boot();tier.t.startGame();const drone=new tier.t.Monster();drone.monsterType=kind;drone.hp=1;drone.x=400;drone.y=320;drone.speed=0;
+    tier.t.state.monsters=[drone];tier.elements.fireBtn.listeners.click();tier.advance(16);tier.t.updateGame();assert.equal(tier.t.state.points,reward,'Tier kill awards correct points');
+    tier.advance(16);tier.t.updateGame();assert.equal(tier.t.state.points,reward,'Dead drones do not award twice');
+}
+
+const shop=boot();shop.t.startGame();shop.t.finishWave();assert.equal(shop.t.state.points,20);
+shop.t.finishWave();assert.equal(shop.t.state.points,20,'Wave reward cannot repeat');
+shop.advance(4100);shop.t.nextWave();assert.equal(shop.t.state.level,2,'Can save points and skip purchases');
+shop.t.finishWave();shop.t.state.points=1000;
+for(let i=0;i<5;i++)shop.t.chooseUpgrade('ammo');assert.equal(shop.t.state.bulletLimit,6);assert.equal(shop.t.state.points,850,'Capped purchases deduct only successful prices');
+shop.t.resetToStartScreen();assert.equal(shop.t.state.points,0);assert.equal(shop.t.state.earnedPoints,0);
+const radar=boot();radar.t.startGame();
+const near=new radar.t.Monster();near.x=500;near.y=400;near.speed=1;near.reveal=0;
+const urgent=new radar.t.Monster();urgent.x=400;urgent.y=250;urgent.speed=4;urgent.monsterType='heavy';
+radar.t.state.monsters=[near,urgent];radar.t.state.beamAngle=Math.PI/2;
+assert.equal(radar.t.breachThreat().drone,urgent,'Warning prioritizes breach time instead of distance');
+radar.t.updateGame();assert.equal(radar.elements.breachWarning.hidden,false);assert(radar.elements.breachWarning.textContent.includes('behind'));
+radar.t.drawRadar();assert.equal(radar.elements.radarCount.textContent,'2 targets','Hidden drones remain on radar');
+radar.t.state.monsters=[];radar.t.updateGame();assert.equal(radar.elements.breachWarning.hidden,true,'Warning clears when threat disappears');
+const effects=boot();effects.t.startGame();const damaged=new effects.t.Monster();damaged.hp=1;damaged.maxHp=2;damaged.reveal=1;damaged.x=600;damaged.y=400;damaged.speed=0;damaged.update(.2);
+assert(effects.t.state.particles.some(p=>p.kind==='smoke'),'Damaged visible drones emit smoke');
+for(let i=0;i<20;i++)effects.t.explodeDrone(damaged);
+assert(effects.t.state.particles.length<=160&&effects.t.state.particles.some(p=>p.kind==='debris'),'Explosion effects share a bounded budget');
+effects.t.updateEffects(2);assert.equal(effects.t.state.particles.length,0,'Smoke and debris expire');
+const alerts=boot(false,true);alerts.t.startGame();const threatDrone=new alerts.t.Monster();threatDrone.x=500;threatDrone.y=400;threatDrone.speed=0;alerts.t.state.monsters=[threatDrone];
+alerts.advance(250);alerts.t.updateGame();assert.equal(alerts.audio.oscillators.filter(o=>o.frequency.value===680).length,1,'Nearby threat emits warning audio');
+alerts.advance(250);alerts.t.updateGame();assert.equal(alerts.audio.oscillators.filter(o=>o.frequency.value===680).length,1,'Alert audio is rate limited');
+alerts.sandbox.document.hidden=true;alerts.advance(2000);alerts.t.updateGame();assert.equal(alerts.audio.oscillators.filter(o=>o.frequency.value===680).length,1,'Background tabs emit no alerts');
+console.log('PASS: points rewards and purchases, optional continuation, caps, radar warnings, damaged smoke and bounded explosions.');
 // Audio is unlocked by start, bounded, panned, muted, persisted and suspended while hidden.
 const droneSound=boot(false,true);droneSound.t.startGame();
 const distantDrone=new droneSound.t.Monster();distantDrone.x=700;distantDrone.y=400;distantDrone.speed=0;
@@ -208,7 +242,8 @@ assert.equal(droneSound.audio.started,1,'Drone beyond the former 220px sound rad
 const farGain=droneSound.audio.gains.at(-1).gain.value;
 droneSound.advance(100);droneSound.t.updateGame();assert.equal(droneSound.audio.started,1,'Rotor sound respects its cadence');
 distantDrone.x=500;droneSound.advance(250);droneSound.t.updateGame();
-assert(droneSound.audio.gains.at(-1).gain.value>farGain,'Drone audio grows louder toward the tower');
+const rotorIndex=droneSound.audio.oscillators.findLastIndex(osc=>osc.frequency.value===180);
+assert(droneSound.audio.gains[rotorIndex+1].gain.value>farGain,'Drone audio grows louder toward the tower');
 assert(droneSound.audio.pans.at(-1).pan.value>0,'Drone audio pans toward its position');
 console.log('PASS: distant drone rotor audio, cadence, approach volume and directional panning.');
 const sound=boot(false,true);sound.t.startGame();assert.equal(sound.audio.resumed,1);
@@ -255,7 +290,7 @@ const unsupported=boot();assert.equal(unsupported.elements.testSoundBtn.disabled
 assert.equal(boot(true).t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','broken json');assert.equal(boot().t.state.highScores.length,0);
 storage.set('castle-defense-scores-v1','[{"name":"bad"}]');assert.equal(boot().t.state.highScores.length,0);
-console.log('PASS: existing controls/combat/scoring plus finite waves, survivor gating, repairs, break/choice gating, one capped upgrade, expanded ammo, reset, pause accounting, bounded/panned audio, mute persistence and hidden-page audio suspension.');
+console.log('PASS: existing controls/combat/scoring plus finite waves, survivor gating, repairs, break/choice gating, paid capped upgrades, expanded ammo, reset, pause accounting, bounded/panned audio, mute persistence and hidden-page audio suspension.');
 console.log('PASS: iOS playback session, gesture retry after interruption, unmute/test chime, async/denied resume, closed-context recovery, unsupported audio and denied session setting.');
 })().catch(error => { console.error(error);process.exitCode=1; });
 
