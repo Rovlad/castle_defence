@@ -47,7 +47,7 @@ function boot(blockStorage = false, withAudio = false) {
         };
     }
     vm.createContext(sandbox);
-    const instrumented = script.replace('        // Start game loop', '        window.test = {get state(){return gameState;}, keys, startGame, updateGame, saveScore, resetToStartScreen, showNameEntry, Monster, finishWave, chooseUpgrade, nextWave, updateBreak, playSound, breachThreat, explodeDrone, updateEffects, drawRadar};\n        // Start game loop');
+    const instrumented = script.replace('        // Start game loop', '        window.test = {get state(){return gameState;}, keys, startGame, updateGame, saveScore, resetToStartScreen, showNameEntry, Monster, finishWave, chooseUpgrade, nextWave, updateBreak, playSound, breachThreat, explodeDrone, updateEffects, drawRadar, droneMotion, sweptHit, Bullet};\n        // Start game loop');
     vm.runInContext(instrumented, sandbox);
     events.DOMContentLoaded();
     return {t:sandbox.window.test, elements, events, sandbox, audio, advance(ms){now+=ms;}, key(code,target){let prevented=false;events.keydown({code,target,repeat:false,preventDefault(){prevented=true;}});return prevented;},
@@ -156,7 +156,7 @@ const clearedAt = waves.sandbox.Date.now();
 const combatTime = clearedAt-waves.t.state.gameStartTime;
 waves.elements.fireBtn.listeners.click();assert.equal(waves.t.state.bullets.length,0);
 waves.t.nextWave();assert.equal(waves.t.state.level,1);
-assert.equal(waves.t.state.points,20);waves.t.chooseUpgrade('ammo');assert.equal(waves.t.state.bulletLimit,3,'Unaffordable upgrade rejected');
+assert.equal(waves.t.state.points,70,'Flawless completed wave earns 20 plus 50');waves.t.state.points=20;waves.t.chooseUpgrade('ammo');assert.equal(waves.t.state.bulletLimit,3,'Unaffordable upgrade rejected');
 waves.t.state.points=80;waves.t.chooseUpgrade('ammo');assert.equal(waves.t.state.bulletLimit,4);assert.equal(waves.t.state.points,30);
 const beamBefore=waves.t.state.beamWidth;waves.t.chooseUpgrade('beam');assert(waves.t.state.beamWidth>beamBefore,'Multiple affordable purchases allowed');assert.equal(waves.t.state.points,0);
 waves.t.nextWave();assert.equal(waves.t.state.phase,'intermission');
@@ -232,6 +232,22 @@ const alerts=boot(false,true);alerts.t.startGame();const threatDrone=new alerts.
 alerts.advance(250);alerts.t.updateGame();assert.equal(alerts.audio.oscillators.filter(o=>o.frequency.value===680).length,1,'Nearby threat emits warning audio');
 alerts.advance(250);alerts.t.updateGame();assert.equal(alerts.audio.oscillators.filter(o=>o.frequency.value===680).length,1,'Alert audio is rate limited');
 alerts.sandbox.document.hidden=true;alerts.advance(2000);alerts.t.updateGame();assert.equal(alerts.audio.oscillators.filter(o=>o.frequency.value===680).length,1,'Background tabs emit no alerts');
+const motion=boot();assert(motion.t.droneMotion('normal',.5,2).drift>0&&motion.t.droneMotion('normal',1.8,2).drift<0,'Scouts zigzag from wave two');
+assert.equal(motion.t.droneMotion('normal',1,1).drift,0);assert.equal(motion.t.droneMotion('armored',1,5).drift,0);assert.equal(motion.t.droneMotion('heavy',5,5).pace,1.6);
+for(const kind of ['normal','armored','heavy']){motion.t.startGame();motion.t.state.level=5;const drone=new motion.t.Monster();drone.monsterType=kind;drone.x=700;drone.y=400;let previous=300;for(let i=0;i<100;i++){drone.update(.025);const distance=Math.hypot(drone.x-400,drone.y-400);assert(distance<previous,'Each flight pattern keeps approaching');previous=distance;}}
+const weapon=boot();weapon.t.startGame();weapon.t.finishWave();weapon.t.state.points=1000;
+for(const kind of ['damage','velocity','blast']){weapon.t.chooseUpgrade(kind);}
+assert.equal(weapon.t.state.shotDamage,2);assert.equal(weapon.t.state.projectileSpeed,11);assert.equal(weapon.t.state.blastRadius,55);assert.equal(weapon.t.state.points,690);
+weapon.t.chooseUpgrade('damage');weapon.t.chooseUpgrade('velocity');const balance=weapon.t.state.points;weapon.t.chooseUpgrade('damage');weapon.t.chooseUpgrade('velocity');weapon.t.chooseUpgrade('blast');assert.equal(weapon.t.state.points,balance,'Weapon upgrades reject purchases beyond caps');
+weapon.t.resetToStartScreen();assert.equal(weapon.t.state.shotDamage,1);assert.equal(weapon.t.state.projectileSpeed,8);assert.equal(weapon.t.state.blastRadius,0);
+const sweep=boot();sweep.t.startGame();sweep.t.state.projectileSpeed=14;const tiny=new sweep.t.Monster();tiny.x=400;tiny.y=300;tiny.radius=1;tiny.speed=0;sweep.t.state.monsters=[tiny];sweep.elements.fireBtn.listeners.click();sweep.advance(33);sweep.t.updateGame();assert.equal(sweep.t.state.kills,1,'Fast bullet hits crossed target even when endpoint misses');assert.equal(sweep.t.state.waveHits,1);assert.equal(sweep.t.state.waveShots,1);
+assert.equal(sweep.t.sweptHit(0,0,20,0,10,5,1),null,'Swept misses stay misses');
+const blast=boot();blast.t.startGame();blast.t.state.shotDamage=3;blast.t.state.blastRadius=55;
+const drones=[[400,320,3],[425,320,1],[440,320,2],[470,320,1]].map(([x,y,hp])=>{const d=new blast.t.Monster();d.x=x;d.y=y;d.hp=d.maxHp=hp;d.speed=0;return d;});blast.t.state.monsters=drones;blast.elements.fireBtn.listeners.click();blast.advance(16);blast.t.updateGame();assert.equal(blast.t.state.kills,2);assert.equal(drones[2].hp,1);assert.equal(drones[3].hp,1);assert.equal(blast.t.state.waveHits,1,'Splash damage does not inflate accuracy');assert.equal(blast.t.state.points,20);
+const result=boot();result.t.startGame();result.t.state.waveSpawned=result.t.state.waveSize;result.t.state.waveShots=4;result.t.state.waveHits=2;result.t.state.waveKills=5;result.t.finishWave();assert.equal(result.t.state.points,70);assert(result.elements.waveResults.textContent.includes('50% accuracy'));assert(result.elements.flawlessBonus.textContent.includes('+50'));result.t.finishWave();assert.equal(result.t.state.points,70,'Bonus awarded only once');result.advance(4100);result.t.nextWave();assert.equal(result.t.state.waveShots,0);assert.equal(result.t.state.waveHits,0);assert.equal(result.t.state.waveBreaches,0);assert.equal(result.t.state.wavePoints,0);result.t.state.waveSpawned=result.t.state.waveSize;result.t.state.waveBreaches=1;result.t.finishWave();assert.equal(result.t.state.points,90,'Breached wave earns clear points without flawless bonus');
+const order=boot();order.t.startGame();order.t.state.projectileSpeed=14;const front=new order.t.Monster(),back=new order.t.Monster();for(const [d,y] of [[front,310],[back,300]]){d.x=400;d.y=y;d.radius=1;d.speed=0;}order.t.state.monsters=[back,front];order.elements.fireBtn.listeners.click();order.advance(33);order.t.updateGame();assert(order.t.state.monsters.includes(back)&&!order.t.state.monsters.includes(front),'Swept shots hit the closest target regardless of array order');
+const payload=boot();payload.t.startGame();payload.t.state.shotDamage=3;payload.t.state.blastRadius=55;payload.t.state.projectileSpeed=14;const round=new payload.t.Bullet(-Math.PI/2);payload.t.state.shotDamage=1;payload.t.state.blastRadius=0;payload.t.state.projectileSpeed=8;assert.equal(round.damage,3);assert.equal(round.blast,55);assert(Math.abs(round.vy+14)<1e-9,'Fired rounds retain the purchased payload');
+console.log('PASS: distinct flight patterns, weapon purchases/caps/reset, swept hits, splash accuracy, wave results and flawless rewards.');
 console.log('PASS: points rewards and purchases, optional continuation, caps, radar warnings, damaged smoke and bounded explosions.');
 // Audio is unlocked by start, bounded, panned, muted, persisted and suspended while hidden.
 const droneSound=boot(false,true);droneSound.t.startGame();

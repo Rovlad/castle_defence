@@ -310,6 +310,11 @@
         #shopBalance{color:#f0d497;font-weight:bold}#upgradeChoices span{display:block;color:#efd397;font-size:13px;margin-top:6px}
         @media(max-width:480px){#radarPanel{width:80px;right:8px;top:8px;padding:5px;font-size:9px}#breachWarning{font-size:11px;bottom:8px;padding:6px 8px}}
         #upgradePanel{align-items:flex-start}.upgrade-card{margin:auto}
+        #waveResults{font-size:13px}#flawlessBonus{color:#eed397;font-weight:bold}#upgradeChoices{grid-template-columns:1fr 1fr}@media(max-width:480px){#upgradeChoices{grid-template-columns:1fr}}
+        .upgrade-card{display:flex;flex-direction:column;width:min(620px,100%);height:min(800px,calc(100dvh - 32px));overflow:hidden}
+        .upgrade-card>*{flex-shrink:0}.upgrade-card p{margin:8px 0}.upgrade-card #upgradeChoices{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px;margin:12px 0}
+        @media(max-height:520px){.upgrade-card{padding:12px 16px}.upgrade-card h2{font-size:20px;margin:0 0 4px}.upgrade-card p{font-size:12px;margin:4px 0;line-height:1.3}#upgradeChoices button{padding:8px;font-size:13px}#upgradeChoices small{font-size:11px}}
+        #upgradeChoices{grid-auto-rows:max-content;align-content:start}
     </style>
 </head>
 <body>
@@ -366,12 +371,15 @@
         <section id="upgradePanel" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle" tabindex="-1">
             <div class="upgrade-card">
                 <h2 id="upgradeTitle">Wave complete</h2>
-                <p id="breakSummary"></p>
+                <p id="breakSummary"></p><p id="waveResults"></p><p id="flawlessBonus"></p>
                 <p>Buy upgrades with earned points, or save them for later.</p><p id="shopBalance"></p>
                 <div id="upgradeChoices">
                     <button id="beamUpgradeBtn">Wider searchlight<small>+5° visibility · maximum 90°</small><span id="beamPrice"></span></button>
                     <button id="rotationUpgradeBtn">Faster turret<small>Turn faster to track approaching enemies · up to 6 upgrades</small><span id="rotationPrice"></span></button>
                     <button id="ammoUpgradeBtn">Extra ammunition<small>+1 bullet slot · maximum 6</small><span id="ammoPrice"></span></button>
+                    <button id="damageUpgradeBtn">Stronger shots<small>+1 direct damage · maximum 3</small><span id="damagePrice"></span></button>
+                    <button id="velocityUpgradeBtn">Faster rounds<small>Faster travel · two upgrades</small><span id="velocityPrice"></span></button>
+                    <button id="blastUpgradeBtn">Explosive shells<small>Nearby drones take 1 splash damage</small><span id="blastPrice"></span></button>
                 </div>
                 <p id="breakStatus" role="status" aria-live="polite"></p>
                 <button id="nextWaveBtn" disabled>Start next wave</button>
@@ -440,6 +448,8 @@
                 breakStartTime: 0,
                 points: 0,
                 earnedPoints: 0,
+                shotDamage: 1, projectileSpeed: 8, blastRadius: 0,
+                waveKills: 0, waveShots: 0, waveHits: 0, waveBreaches: 0, wavePoints: 0,
                 lastWarningTime: 0,
                 rotationSpeed: 3,
                 bulletLimit: 3,
@@ -491,6 +501,18 @@
             Space: false
         };
         
+        function droneMotion(kind,age,wave){
+            return {drift:kind==='normal'&&wave>=2?Math.sin(age*2.5)*.65:0,
+                pace:kind==='heavy'&&age%6>=4?1.6:1};
+        }
+        function sweptHit(ax,ay,bx,by,x,y,radius){
+            const dx=bx-ax,dy=by-ay,ox=ax-x,oy=ay-y;
+            const a=dx*dx+dy*dy,c=ox*ox+oy*oy-radius*radius;
+            if(c<=0)return 0;if(a<1e-9)return null;
+            const b=2*(ox*dx+oy*dy),discriminant=b*b-4*a*c;
+            if(discriminant<0)return null;
+            const t=(-b-Math.sqrt(discriminant))/(2*a);return t>=0&&t<=1?t:null;
+        }
         class Monster {
             constructor() {
                 const angle = gameState.monsterCount === 0 ? gameState.beamAngle : Math.random() * 2 * Math.PI;
@@ -523,20 +545,16 @@
                 this.visible = false;
                 this.atCastle = false;
                 
-                // For curved movement (level 3+)
-                this.curveOffset = 0;
-                this.curveDirection = Math.random() > 0.5 ? 1 : -1;
-                this.curveIntensity = 0.02 + Math.random() * 0.03;
-                this.timeSinceDirectionChange = 0;
-                this.directionChangeInterval = 60 + Math.random() * 60;
                 
                 // For hit animation
                 this.hitFlash = 0;
+                this.flightAge = 0;
                 this.smokeElapsed = 0;
                 this.rotorPhase = Math.random() * Math.PI;
             }
             
             update(deltaTime) {
+                this.flightAge += deltaTime;
                 this.rotorPhase = (this.rotorPhase + deltaTime * 35) % (Math.PI * 2);
                 // Decay the hit flash here rather than in draw() so it fades on schedule
                 // even while the monster sits hidden outside the beam
@@ -557,6 +575,7 @@
                 if (dist < castleRadius + this.radius) {
                     if (!this.atCastle) {
                         this.atCastle = true;
+                        gameState.waveBreaches++;
                         gameState.health = Math.max(0, gameState.health - 1);
                         gameState.damageFlash = 0.6;
                         spawnParticles(this.x, this.y, '#ed957c', 22);
@@ -571,35 +590,12 @@
                     return false;
                 }
 
-                // Calculate base movement toward castle - now time-based
-                const speedPerSecond = this.speed * 60; // Convert to pixels per second (assuming 60fps baseline)
-                let moveX = (dx / dist) * speedPerSecond * deltaTime;
-                let moveY = (dy / dist) * speedPerSecond * deltaTime;
-                
-                // Apply curved movement for level 3+
-                if (gameState.level >= 3) {
-                    // Update curve timing - now time-based
-                    this.timeSinceDirectionChange += deltaTime * 60; // Convert to frame-equivalent
-                    
-                    // Randomly change curve direction
-                    if (this.timeSinceDirectionChange > this.directionChangeInterval) {
-                        this.curveDirection *= -1;
-                        this.timeSinceDirectionChange = 0;
-                        this.directionChangeInterval = 60 + Math.random() * 60;
-                    }
-                    
-                    // Calculate perpendicular vector for sideways movement
-                    const perpX = -dy / dist;
-                    const perpY = dx / dist;
-                    
-                    // Add curved movement - now time-based
-                    const curveAmount = Math.sin(this.curveOffset) * this.curveDirection * 0.5;
-                    moveX += perpX * curveAmount * speedPerSecond * deltaTime;
-                    moveY += perpY * curveAmount * speedPerSecond * deltaTime;
-                    
-                    this.curveOffset += this.curveIntensity * deltaTime * 60; // Convert to frame-equivalent
-                }
-                
+                const motion=droneMotion(this.monsterType,this.flightAge,gameState.level);
+                const speedPerSecond=this.speed*60*motion.pace;
+                let moveX=(dx/dist)*speedPerSecond*deltaTime;
+                let moveY=(dy/dist)*speedPerSecond*deltaTime;
+                moveX+=(-dy/dist)*motion.drift*speedPerSecond*deltaTime;
+                moveY+=(dx/dist)*motion.drift*speedPerSecond*deltaTime;
                 // Apply movement
                 this.x += moveX;
                 this.y += moveY;
@@ -670,14 +666,17 @@
             constructor(angle) {
                 this.x = centerX + Math.cos(angle) * (castleRadius + 20);
                 this.y = centerY + Math.sin(angle) * (castleRadius + 20);
-                this.vx = Math.cos(angle) * 8;
-                this.vy = Math.sin(angle) * 8;
+                this.vx = Math.cos(angle) * gameState.projectileSpeed;
+                this.vy = Math.sin(angle) * gameState.projectileSpeed;
                 this.radius = 4;
+                this.previousX=this.x;this.previousY=this.y;
+                this.damage=gameState.shotDamage;this.blast=gameState.blastRadius;gameState.waveShots++;
                 gameState.muzzleFlash = 0.09;
                 playSound('shot');
             }
             
             update(deltaTime) {
+                this.previousX=this.x;this.previousY=this.y;
                 this.x += this.vx * deltaTime * 60; // Convert to time-based movement
                 this.y += this.vy * deltaTime * 60;
                 
@@ -816,13 +815,21 @@
         const SHOP = {
             beam:{cost:30,button:'beamUpgradeBtn',price:'beamPrice'},
             rotation:{cost:40,button:'rotationUpgradeBtn',price:'rotationPrice'},
-            ammo:{cost:50,button:'ammoUpgradeBtn',price:'ammoPrice'}
+            ammo:{cost:50,button:'ammoUpgradeBtn',price:'ammoPrice'},
+            damage:{cost:100,button:'damageUpgradeBtn',price:'damagePrice'},
+            velocity:{cost:60,button:'velocityUpgradeBtn',price:'velocityPrice'},
+            blast:{cost:150,button:'blastUpgradeBtn',price:'blastPrice'}
         };
-        function canUpgrade(kind){return kind==='beam'?gameState.beamWidth<Math.PI/2-.001:kind==='rotation'?gameState.rotationSpeed<5.4-.001:kind==='ammo'?gameState.bulletLimit<6:false;}
-        function awardPoints(points){gameState.points+=points;gameState.earnedPoints+=points;}
+        function canUpgrade(kind){return kind==='beam'?gameState.beamWidth<Math.PI/2-.001:kind==='rotation'?gameState.rotationSpeed<5.4-.001:kind==='ammo'?gameState.bulletLimit<6:kind==='damage'?gameState.shotDamage<3:kind==='velocity'?gameState.projectileSpeed<14:kind==='blast'?gameState.blastRadius===0:false;}
+        function awardPoints(points){gameState.points+=points;gameState.earnedPoints+=points;gameState.wavePoints+=points;}
         function finishWave() {
             if(gameState.phase!=='combat'||gameState.blinkingPhase||gameState.gameOver)return;
-            gameState.phase='intermission';gameState.breakStartTime=Date.now();awardPoints(20);
+            gameState.phase='intermission';gameState.breakStartTime=Date.now();
+            const flawless=gameState.waveBreaches===0&&gameState.waveSpawned===gameState.waveSize;
+            awardPoints(20+(flawless?50:0));
+            const accuracy=gameState.waveShots?Math.round(gameState.waveHits/gameState.waveShots*100):0;
+            document.getElementById('waveResults').textContent=`${gameState.waveKills} kills · ${gameState.waveBreaches} breaches · ${accuracy}% accuracy (${gameState.waveHits}/${gameState.waveShots} shots) · ${formatTime((Date.now()-gameState.waveStartTime)/1000)} combat · ${gameState.wavePoints} points earned`;
+            document.getElementById('flawlessBonus').textContent=flawless?'FLAWLESS DEFENCE · +50 bonus points':'No flawless bonus this wave. Keep every drone out to earn +50.';
             gameState.bullets=[];gameState.bouncingBullets=[];clearKeys();
             const repaired=gameState.health<3;gameState.health=Math.min(3,gameState.health+1);
             document.getElementById('upgradeTitle').textContent=`Wave ${gameState.level} cleared`;
@@ -848,18 +855,23 @@
             if(kind==='beam')gameState.beamWidth=Math.min(Math.PI/2,gameState.beamWidth+Math.PI/36);
             if(kind==='rotation')gameState.rotationSpeed=Math.min(5.4,gameState.rotationSpeed+.4);
             if(kind==='ammo')gameState.bulletLimit++;
+            if(kind==='damage')gameState.shotDamage++;
+            if(kind==='velocity')gameState.projectileSpeed=Math.min(14,gameState.projectileSpeed+3);
+            if(kind==='blast')gameState.blastRadius=55;
             gameState.points-=SHOP[kind].cost;updateBreak();updateHud();playSound('upgrade');
             document.getElementById(document.getElementById('nextWaveBtn').disabled?'upgradePanel':'nextWaveBtn').focus();
         }
         function nextWave(){
             if(gameState.phase!=='intermission'||Date.now()-gameState.breakStartTime<4000)return;
             const now=Date.now();gameState.gameStartTime+=now-gameState.breakStartTime;
+            gameState.waveKills=gameState.waveShots=gameState.waveHits=gameState.waveBreaches=gameState.wavePoints=0;
             gameState.level++;gameState.waveStartTime=now;gameState.waveElapsed=0;
             gameState.waveSize=Math.min(25,5+(gameState.level-1)*2);gameState.waveSpawned=0;
             gameState.monsterSpawnInterval=Math.max(.8,2.6-(gameState.level-1)*.15);
             gameState.lastSpawnTime=gameState.lastUpdateTime=now;gameState.firstSpawn=true;gameState.phase='combat';
             clearKeys();unlockAudio();document.getElementById('upgradePanel').style.display='none';updateHud();document.getElementById('fireBtn').focus();
         }
+        for(const kind of ['damage','velocity','blast'])document.getElementById(SHOP[kind].button).addEventListener('click',()=>chooseUpgrade(kind));
         document.getElementById('beamUpgradeBtn').addEventListener('click', () => chooseUpgrade('beam'));
         document.getElementById('rotationUpgradeBtn').addEventListener('click', () => chooseUpgrade('rotation'));
         document.getElementById('ammoUpgradeBtn').addEventListener('click', () => chooseUpgrade('ammo'));
@@ -960,6 +972,13 @@
             }
             gameState.particles = gameState.particles.slice(-160);
         }
+        function damageDrone(drone,damage){
+            drone.hp=Math.max(0,drone.hp-damage);drone.hitFlash=5;
+            playSound(drone.hp>0?'armor':'hit');
+            if(drone.hp>0)spawnParticles(drone.x,drone.y,'#eed6a5',7);
+            else {explodeDrone(drone);gameState.monsters=gameState.monsters.filter(m=>m!==drone);gameState.kills++;gameState.waveKills++;
+                awardPoints(drone.monsterType==='heavy'?30:drone.monsterType==='armored'?20:10);}
+        }
         function explodeDrone(drone){
             spawnParticles(drone.x,drone.y,'#ffc572',18);
             for(let i=0;i<12;i++){
@@ -974,7 +993,7 @@
             for(const drone of gameState.monsters){
                 const distance=Math.hypot(drone.x-centerX,drone.y-centerY);
                 if(distance>180)continue;
-                const eta=Math.max(0,distance-castleRadius-drone.radius)/Math.max(.01,drone.speed*60);
+                const eta=Math.max(0,distance-castleRadius-drone.radius)/Math.max(.01,drone.speed*60*droneMotion(drone.monsterType,drone.flightAge,gameState.level).pace);
                 if(!threat||eta<threat.eta){
                     let bearing=Math.atan2(drone.y-centerY,drone.x-centerX)-gameState.beamAngle;
                     bearing=Math.atan2(Math.sin(bearing),Math.cos(bearing));threat={drone,eta,bearing};
@@ -1107,36 +1126,22 @@
             // Update bullets
             gameState.bullets = gameState.bullets.filter(bullet => bullet.update(deltaTime));
             
-            // Check collisions
-            for (let i = gameState.bullets.length - 1; i >= 0; i--) {
-                const bullet = gameState.bullets[i];
-                for (let j = gameState.monsters.length - 1; j >= 0; j--) {
-                    const monster = gameState.monsters[j];
-                    const dist = Math.sqrt((bullet.x - monster.x) ** 2 + (bullet.y - monster.y) ** 2);
-                    
-                    if (dist < bullet.radius + monster.radius) {
-                        gameState.bullets.splice(i, 1);
-                        
-                        // Damage the monster
-                        monster.hp--;
-                        playSound(monster.hp > 0 ? 'armor' : 'hit');
-                        if(monster.hp>0)spawnParticles(monster.x,monster.y,'#eed6a5',7);else explodeDrone(monster);
-                        
-                        if (monster.hp <= 0) {
-                            // Monster killed
-                            gameState.monsters.splice(j, 1);
-                            gameState.kills++;awardPoints(monster.monsterType==='heavy'?30:monster.monsterType==='armored'?20:10);
-                        } else {
-                            // Monster hit but not killed - bullet bounces off
-                            monster.hitFlash = 5; // Flash white for ~5 frames at 60fps
-                            const angle = Math.atan2(bullet.y - monster.y, bullet.x - monster.x);
-                            gameState.bouncingBullets.push(new BouncingBullet(monster.x, monster.y, angle));
-                        }
-                        break;
-                    }
+            // Sweep the whole travelled segment; resolve the closest direct target.
+            for(let i=gameState.bullets.length-1;i>=0;i--){
+                const bullet=gameState.bullets[i];let closest=null,closestT=Infinity;
+                for(const drone of gameState.monsters){
+                    const t=sweptHit(bullet.previousX,bullet.previousY,bullet.x,bullet.y,drone.x,drone.y,drone.radius+bullet.radius);
+                    if(t!==null&&t<closestT){closest=drone;closestT=t;}
                 }
+                if(!closest)continue;
+                gameState.bullets.splice(i,1);gameState.waveHits++;
+                const impact={x:closest.x,y:closest.y};damageDrone(closest,bullet.damage);
+                if(bullet.blast>0){
+                    spawnParticles(impact.x,impact.y,'#ffc66c',20);
+                    for(const drone of [...gameState.monsters])if(drone!==closest&&Math.hypot(drone.x-impact.x,drone.y-impact.y)<=bullet.blast)damageDrone(drone,1);
+                }
+                if(closest.hp>0){const angle=Math.atan2(bullet.y-closest.y,bullet.x-closest.x);gameState.bouncingBullets.push(new BouncingBullet(closest.x,closest.y,angle));}
             }
-            
             // Update bouncing bullets
             gameState.bouncingBullets = gameState.bouncingBullets.filter(bullet => bullet.update(deltaTime));
             
@@ -1360,9 +1365,12 @@
                 if (e.code === 'Digit1') chooseUpgrade('beam');
                 else if (e.code === 'Digit2') chooseUpgrade('rotation');
                 else if (e.code === 'Digit3') chooseUpgrade('ammo');
+                else if (e.code === 'Digit4') chooseUpgrade('damage');
+                else if (e.code === 'Digit5') chooseUpgrade('velocity');
+                else if (e.code === 'Digit6') chooseUpgrade('blast');
                 else if (e.code === 'Enter' && !(e.target instanceof HTMLButtonElement)) nextWave();
                 else if (e.code === 'Tab') {
-                    const choices = ['beamUpgradeBtn','rotationUpgradeBtn','ammoUpgradeBtn','nextWaveBtn']
+                    const choices = [...Object.values(SHOP).map(item=>item.button),'nextWaveBtn']
                         .map(id => document.getElementById(id)).filter(button => !button.disabled);
                     const current = choices.indexOf(e.target);
                     if (choices.length) choices[(current + (e.shiftKey ? -1 : 1) + choices.length) % choices.length].focus();
