@@ -320,10 +320,3 @@ repair.t.resetToStartScreen();assert.equal(repair.t.state.health,5);assert(repai
 console.log('PASS: existing controls/combat/scoring plus finite waves, survivor gating, repairs, break/choice gating, paid capped upgrades, expanded ammo, reset, pause accounting, bounded/panned audio, mute persistence and hidden-page audio suspension.');
 console.log('PASS: iOS playback session, gesture retry after interruption, unmute/test chime, async/denied resume, closed-context recovery, unsupported audio and denied session setting.');
 })().catch(error => { console.error(error);process.exitCode=1; });
-
-
-
-
-
-
-
