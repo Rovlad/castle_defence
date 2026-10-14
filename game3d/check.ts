@@ -184,3 +184,32 @@ assert(!light.upgrade('brightness')&&light.points===0,'Brightness is capped at t
 light.tick(4);light.nextWave();assert(light.brightnessLevel===3,'Brightness persists across waves');
 assert(new Siege().brightnessLevel===0&&new Siege().searchlightIntensity===4.6,'New run restores starting brightness');
 console.log('PASS: brightness purchases, intensity levels, cap, wave persistence and reset.');
+
+// Exercise Babylon's actual projection update after each aim change, not just its direction.
+const { NullEngine } = await import('@babylonjs/core/Engines/nullEngine.js');
+const { Scene } = await import('@babylonjs/core/scene.js');
+const { SpotLight } = await import('@babylonjs/core/Lights/spotLight.js');
+const { Vector3 } = await import('@babylonjs/core/Maths/math.vector.js');
+const { RawTexture } = await import('@babylonjs/core/Materials/Textures/rawTexture.js');
+const { pointSearchlight } = await import('./src/searchlight.ts');
+const engine = new NullEngine();
+const scene = new Scene(engine);
+const spotlight = new SpotLight('regression searchlight',new Vector3(STATION.x,STATION.y,STATION.z),new Vector3(0,-.1,1),Math.PI/5,1,scene);
+spotlight.projectionTexture = RawTexture.CreateRGBATexture(new Uint8Array([255,255,255,255]),1,1,scene);
+// NullEngine has no GPU readiness; the CPU projection path still needs a ready texture.
+spotlight.projectionTexture.isReady = () => true;
+let projected: InstanceType<typeof Vector3> | undefined;
+let probe = new Vector3();
+const effect = {
+    setMatrix(_name:string,matrix:import('@babylonjs/core/Maths/math.vector.js').Matrix){projected=Vector3.TransformCoordinates(probe,matrix);},
+    setTexture(){}
+};
+for(const [yaw,pitch] of [[0,.1],[Math.PI/2,.1],[Math.PI,.1],[-Math.PI/2,-.28],[0,.6],[0,.1]]){
+    const direction=aimDirection(yaw,pitch);
+    probe=spotlight.position.add(new Vector3(direction.x,direction.y,direction.z).scale(20));
+    pointSearchlight(spotlight,direction);
+    spotlight.transferTexturesToEffect(effect as unknown as import('@babylonjs/core/Materials/effect.js').Effect,'0');
+    assert(projected&&Math.abs(projected.x-.5)<1e-5&&Math.abs(projected.y-.5)<1e-5,'Projected beam stays centered after yaw and pitch changes');
+}
+engine.dispose();
+console.log('PASS: Babylon searchlight projection follows repeated yaw and pitch changes.');

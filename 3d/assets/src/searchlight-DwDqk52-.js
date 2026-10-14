@@ -1,0 +1,1 @@
+import"../node_modules/@babylonjs/core/Maths/math.vector-6nUncOPT.js";import{Vector3 as r}from"../node_modules/@babylonjs/core/Maths/math.vector.pure-CBXzJvIm.js";function i(t,o){t.direction=new r(o.x,o.y,o.z)}export{i as pointSearchlight};
