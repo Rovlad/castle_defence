@@ -27,7 +27,9 @@ function updateIntro(){
     el('introGuide').hidden=!intro;el('hud').classList.toggle('practicing',!!intro);
     if(!intro)return;
     const titles={aim:'1 / 3 · Sweep the searchlight',shoot:'2 / 3 · Shoot the drone',radar:'3 / 3 · Follow the radar',complete:'Training complete'};
-    el('introTitle').textContent=titles[intro.stage];el('introMessage').textContent=intro.message;
+    const title=el('introTitle'),message=el('introMessage');
+    if(title.textContent!==titles[intro.stage])title.textContent=titles[intro.stage];
+    if(message.textContent!==intro.message)message.textContent=intro.message;
     el('introContinueBtn').hidden=intro.stage!=='complete';
     el('introSkipBtn').hidden=intro.stage==='complete';
     el('radarPanel').classList.toggle('trainingRadar',intro.stage==='radar');
@@ -162,7 +164,7 @@ el('introContinueBtn').addEventListener('click',()=>{
 });
 function jam(){if(blocked())return;void audio.unlock();if(game.pulse()){consumeEvents();updateHud();}}
 el('jamBtn').addEventListener('click',jam);
-el('restartBtn').addEventListener('click',()=>{defeat.close();arena?.reset();game=new Siege(Math.random,game.difficulty);lastStep=0;start();});
+el('restartBtn').addEventListener('click',()=>{defeat.close();beginRun();});
 el('nextBtn').addEventListener('click',()=>{if(game.nextWave()){resupply.close();clearInput();lastTime=performance.now();lastStep=game.elapsed;canvas.focus();void audio.unlock();toast(`Wave ${game.wave}`);updateHud();}});
 document.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button=>button.addEventListener('click',()=>{
     if(game.upgrade(button.dataset.upgrade as Upgrade)){
@@ -250,7 +252,8 @@ window.addEventListener('resize',()=>{arena?.engine.resize();radar.resize();});
 soundStatus();showBest();updateHud();
 try{
     arena=new Arena(canvas);
-    el<HTMLButtonElement>('startBtn').disabled=false;el('startBtn').textContent=introSeen?'Take your position':'Learn to defend · Play intro';
+    for(const id of ['startBtn','skipOpeningBtn','practiceBtn'])el<HTMLButtonElement>(id).disabled=false;
+    el('startBtn').textContent=introSeen?'Take your position':'Learn to defend · Play intro';
     const render=()=>{
         const now=performance.now(),elapsed=Math.max(0,(now-lastTime)/1000),dt=Math.min(.05,elapsed);lastTime=now;
         if(!document.hidden&&!settings.open&&!game.paused){
