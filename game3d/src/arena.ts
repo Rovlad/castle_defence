@@ -24,10 +24,15 @@ import { pointSearchlight } from './searchlight';
 export class Arena {
     engine: Engine; scene: Scene; camera: FreeCamera; spotlight: SpotLight;
     private shadow: ShadowGenerator; private weapon: TransformNode; private flash: Mesh; private muzzle: PointLight;
-    private bodies = new Map<number,{root:TransformNode;rotors:Mesh[];meshes:Mesh[];paint:StandardMaterial;cracks:Mesh[];smokeTime:number}>();
+    private bodies = new Map<number,{root:TransformNode;rotors:Mesh[];meshes:Mesh[];paint:StandardMaterial;cracks:Mesh[];smokeTime:number;details:TransformNode}>();
     private rounds = new Map<number,Mesh>();
     private sparks: {mesh:Mesh;velocity:Vector3;life:number;duration:number;kind:'spark'|'smoke'|'debris'|'blast'}[] = [];
     private shotFlash = 0; private recoil = 0;
+    private lowQuality=false;
+    private details:TransformNode;
+    private explosion:PointLight;
+    private explosionTime=0;
+    private red:StandardMaterial;private green:StandardMaterial;private steel:StandardMaterial;
     private stone: StandardMaterial; private metal: StandardMaterial; private amber: StandardMaterial;
     private enemyMaterials: Record<string,StandardMaterial>;
     private engineGlow: StandardMaterial;
@@ -47,6 +52,11 @@ export class Arena {
         this.engineGlow = this.material('engine glow','#86d8e3',true);
         this.smokeMaterial=this.material('engine smoke','#52616a');this.smokeMaterial.alpha=.45;
         this.soot=this.material('scorched armor','#1b252c');
+        this.steel=this.material('brushed steel','#9aafb5');this.steel.specularColor.set(.45,.5,.55);this.steel.specularPower=48;
+        this.red=this.material('port navigation','#f45848',true);this.green=this.material('starboard navigation','#64e7b1',true);
+        this.details=new TransformNode('optional scenery details',this.scene);
+        this.explosion=new PointLight('explosion illumination',Vector3.Zero(),this.scene);
+        this.explosion.diffuse=new Color3(1,.47,.12);this.explosion.range=18;this.explosion.intensity=0;
         const hemi = new HemisphericLight('night ambient',new Vector3(0,1,0),this.scene);hemi.intensity = .32;
         hemi.diffuse = new Color3(.55,.68,.84);hemi.groundColor = new Color3(.12,.18,.21);
         const moonlight = new DirectionalLight('moonlight',new Vector3(.35,-1,.5),this.scene);moonlight.intensity = .25;
@@ -85,6 +95,7 @@ export class Arena {
     }
     private material(name:string,hex:string,emissive=false) {
         const material=new StandardMaterial(name,this.scene);material.diffuseColor=Color3.FromHexString(hex);
+        material.maxSimultaneousLights=5;
         material.specularColor = emissive ? Color3.Black() : new Color3(.12,.15,.17);
         if(emissive){material.emissiveColor=material.diffuseColor;material.disableLighting=true;}return material;
     }
@@ -112,6 +123,7 @@ export class Arena {
             tower.position.set(Math.sin(a)*6.1,1.5,Math.cos(a)*6.1);tower.material=wallMat;
             this.box('lantern',.16,.4,.16,this.amber,new Vector3(Math.sin(a)*5.2,3.1,Math.cos(a)*5.2));
         }
+        this.buildIndustry();
         const rockMat=this.material('ruins','#344c59'),bark=this.material('deadwood','#263b42');
         for(let i=0;i<50;i++) {
             const a=Math.random()*Math.PI*2,r=17+Math.random()*57;
@@ -134,6 +146,47 @@ export class Arena {
             const star=MeshBuilder.CreateSphere('star',{diameter:.12+Math.random()*.16,segments:4},this.scene);
             star.position.set(Math.sin(a)*r,35+Math.random()*65,Math.cos(a)*r);star.material=stars;star.applyFog=false;}
     }
+    private cylinder(name:string,height:number,diameter:number,pos:Vector3,mat:StandardMaterial,parent?:TransformNode){
+        const mesh=MeshBuilder.CreateCylinder(name,{height,diameter,tessellation:16},this.scene);
+        mesh.position.copyFrom(pos);mesh.material=mat;mesh.isPickable=false;mesh.receiveShadows=true;if(parent)mesh.parent=parent;return mesh;
+    }
+    private buildIndustry(){
+        const concrete=this.material('concrete pads','#546874'),paint=this.material('industrial teal','#366b73');
+        // Low storage tanks surround the gun; taller plant silhouettes sit beyond drone spawns.
+        for(const [x,z] of [[-14,13],[15,15],[-17,-14],[16,-13]]){
+            this.box('equipment foundation',7,.22,7,concrete,new Vector3(x,.11,z));
+            this.cylinder('storage tank',2.8,5,new Vector3(x,1.6,z),this.steel);
+            const roof=MeshBuilder.CreateCylinder('tank conical roof',{height:.55,diameterTop:.5,diameterBottom:5.1,tessellation:16},this.scene);
+            roof.position.set(x,3.25,z);roof.material=this.steel;roof.isPickable=false;
+            this.cylinder('tank roof hatch',.2,.7,new Vector3(x,3.65,z),this.metal);
+            for(const y of [.5,2.7])this.cylinder('tank seam',.06,5.04,new Vector3(x,y,z),this.metal,this.details);
+            for(let y=.45;y<3;y+=.4)this.box('ladder rung',.65,.05,.12,this.amber,new Vector3(x+2.55,y,z),this.details);
+            for(const dx of [-.3,.3])this.box('tank ladder',.06,2.9,.08,this.metal,new Vector3(x+2.55,1.6,z+dx),this.details);
+        }
+        for(let i=0;i<6;i++){
+            const a=i*Math.PI/3+.2,x=Math.sin(a)*83,z=Math.cos(a)*83;
+            const root=new TransformNode('distant refinery',this.scene);root.position.set(x,0,z);root.rotation.y=a;
+            this.box('process building',12,4,8,paint,new Vector3(0,2,0),root);
+            for(const dx of [-3,3]){
+                this.cylinder('rectification column',14,2,new Vector3(dx,7,-6),this.steel,root);
+                for(const y of [4,8,12])this.cylinder('column platform',.18,3,new Vector3(dx,y,-6),this.metal,root);
+                this.box('column ladder',.22,12,.12,this.amber,new Vector3(dx+1.1,6,-6),root);
+                this.box('column beacon',.22,.3,.22,this.red,new Vector3(dx,14.2,-6),root);
+            }
+            for(let j=0;j<4;j++)this.box('lit factory window',1.1,.65,.08,this.amber,new Vector3(-4+j*2.6,2.7,4.05),root);
+            this.cylinder('smokestack',19,.8,new Vector3(7,9.5,-4),this.metal,root);
+        }
+        for(let i=0;i<16;i++){
+            const a=i*Math.PI/8,x=Math.sin(a)*10,z=Math.cos(a)*10;
+            this.box('perimeter bollard',.18,.65,.18,this.metal,new Vector3(x,.4,z));
+            this.box('amber perimeter marker',.22,.12,.22,this.amber,new Vector3(x,.8,z));
+            const fence=this.box('perimeter rail',.055,.055,3.5,this.steel,new Vector3(Math.sin(a+.1)*10,.5,Math.cos(a+.1)*10),this.details);fence.rotation.y=a+Math.PI/2;
+        }
+        for(const x of [-10,10]){
+            const pipe=this.cylinder('supply pipe',24,.35,new Vector3(x,.35,0),paint);pipe.rotation.x=Math.PI/2;
+            for(const z of [-8,0,8])this.box('pipe saddle',.7,.45,.3,this.metal,new Vector3(x,.22,z),this.details);
+        }
+    }
     private createEnemy(enemy:Enemy) {
         const root=new TransformNode(`enemy ${enemy.id}`,this.scene),mat=this.enemyMaterials[enemy.kind].clone(`drone paint ${enemy.id}`)!;
         const heavy=enemy.kind==='heavy',armored=enemy.kind==='armored',scale=heavy?1.35:armored?1.1:1;
@@ -151,7 +204,24 @@ export class Arena {
             const exhaust=MeshBuilder.CreateCylinder('engine exhaust',{height:.18,diameterTop:.18*scale,diameterBottom:.06,tessellation:6},this.scene);
             exhaust.parent=root;exhaust.position.set(x,-.14*scale,z);exhaust.material=this.engineGlow;
         }
-        for(const x of [-.18,.18])this.box('navigation light',.1,.05,.08,this.amber,new Vector3(x*scale,0,-.57*scale),root);
+        for(const side of [-1,1])this.box('navigation light',.12,.08,.14,side<0?this.red:this.green,new Vector3(side*.48*scale,.10,-.4*scale),root);
+        const details=new TransformNode('optional drone details',this.scene);details.parent=root;details.setEnabled(!this.lowQuality);
+        this.box('avionics cover',.46*scale,.10,.55*scale,this.steel,new Vector3(0,.2*scale,0),root);
+        for(const side of [-1,1]){
+            for(let z=-.3;z<=.3;z+=.15)this.box('cooling vent',.025,.025,.09,this.soot,new Vector3(side*.18,.27*scale,z),details);
+            const skid=this.box('landing skid',.045,.045,.8*scale,this.steel,new Vector3(side*.36*scale,-.38*scale,0),details);
+            this.box('landing leg',.05,.2,.05,this.metal,new Vector3(skid.position.x,-.28*scale,.2),details);
+        }
+        const sensor=MeshBuilder.CreateSphere('underslung camera',{diameter:.26,segments:8},this.scene);
+        sensor.parent=root;sensor.position.set(0,-.26*scale,.43*scale);sensor.material=this.metal;
+        this.box('sensor lens',.12,.09,.04,this.engineGlow,new Vector3(0,-.27*scale,.57*scale),root);
+        if(heavy){
+            for(const x of [-.32,.32])this.box('heavy payload pod',.25,.32,1.2,this.metal,new Vector3(x,-.38,.1),root);
+            this.box('heavy identification stripe',.6,.025,.12,this.amber,new Vector3(0,.31,0),root);
+        }
+        if(!armored&&!heavy){
+            for(const side of [-1,1]){const fin=this.box('scout stabilizer',.4,.045,.2,this.steel,new Vector3(side*.45,.1,-.55),root);fin.rotation.z=side*.25;}
+        }
         if(armored) {
             this.box('armored shell',.68,.14,.72,this.metal,new Vector3(0,.18,0),root);
             for(const side of [-1,1])this.box('armor plate',.15,.24,.8,mat,new Vector3(side*.42,.02,0),root);
@@ -163,32 +233,38 @@ export class Arena {
             crack.rotation.y=side*.5;crack.setEnabled(false);cracks.push(crack);
         }
         const meshes=root.getChildMeshes() as Mesh[];meshes.forEach(mesh=>{mesh.isPickable=false;this.shadow.addShadowCaster(mesh);});
-        hull.receiveShadows=true;this.bodies.set(enemy.id,{root,rotors,meshes,paint:mat,cracks,smokeTime:0});return this.bodies.get(enemy.id)!;
+        hull.receiveShadows=true;this.bodies.set(enemy.id,{root,rotors,meshes,paint:mat,cracks,smokeTime:0,details});return this.bodies.get(enemy.id)!;
     }
     private effect(pos:Vector3,kind:'spark'|'smoke'|'debris'|'blast',duration:number) {
-        if(this.sparks.length>=160){this.sparks.shift()!.mesh.dispose();}
+        while(this.sparks.length>=(this.lowQuality?64:160)){this.sparks.shift()!.mesh.dispose();}
         const mesh=kind==='smoke'||kind==='blast'?MeshBuilder.CreateSphere(kind,{diameter:kind==='smoke'?.35:.4,segments:6},this.scene):
             MeshBuilder.CreateBox(kind,{size:kind==='debris'?.2:.07},this.scene);
-        mesh.isPickable=false;mesh.position.copyFrom(pos);mesh.material=kind==='smoke'?this.smokeMaterial:kind==='debris'?this.metal:this.amber;
+        if(kind==='spark')mesh.scaling.set(.55,.55,3);
+        if(kind==='debris')mesh.scaling.set(.8+Math.random(),.4,1.5+Math.random()*2);
+        mesh.isPickable=false;mesh.position.copyFrom(pos);mesh.material=kind==='smoke'?this.smokeMaterial:kind==='debris'?this.steel:this.amber;
         const velocity=kind==='smoke'?new Vector3((Math.random()-.5)*.6,1.2,0):kind==='blast'?Vector3.Zero():
             new Vector3((Math.random()-.5)*9,2+Math.random()*5,(Math.random()-.5)*9);
         this.sparks.push({mesh,velocity,life:duration,duration,kind});
     }
     event(event:GameEvent) {
+        const count=(n:number)=>this.lowQuality?Math.ceil(n*.5):n;
+        if((event.kind==='kill'||event.kind==='blast')&&event.pos&&!this.lowQuality){
+            this.explosion.position.set(event.pos.x,event.pos.y,event.pos.z);this.explosionTime=.22;
+        }
         if(event.kind==='shot'){this.shotFlash=.07;this.recoil=.055;}
         if((event.kind==='hit'||event.kind==='breach')&&event.pos) {
             const pos=new Vector3(event.pos.x,event.pos.y,event.pos.z);
-            for(let i=0;i<9;i++)this.effect(pos,'spark',.3+Math.random()*.25);
+            for(let i=0;i<count(9);i++)this.effect(pos,'spark',.3+Math.random()*.25);
         }
         if(event.kind==='kill'&&event.pos){
             const pos=new Vector3(event.pos.x,event.pos.y,event.pos.z);
             this.effect(pos,'blast',.25);
-            for(let i=0;i<12;i++)this.effect(pos,i<7?'debris':'spark',.6+Math.random()*.5);
-            for(let i=0;i<4;i++)this.effect(pos,'smoke',1.1);
+            for(let i=0;i<count(12);i++)this.effect(pos,i<count(7)?'debris':'spark',.6+Math.random()*.5);
+            for(let i=0;i<count(4);i++)this.effect(pos,'smoke',1.1);
         }
         if(event.kind==='blast'&&event.pos){
             const pos=new Vector3(event.pos.x,event.pos.y,event.pos.z);this.effect(pos,'blast',.45);
-            for(let i=0;i<12;i++)this.effect(pos,'spark',.5+Math.random()*.3);
+            for(let i=0;i<count(12);i++)this.effect(pos,'spark',.5+Math.random()*.3);
         }
     }
     update(game:Siege,dt:number) {
@@ -221,11 +297,14 @@ export class Arena {
         this.sparks=this.sparks.filter(p=>{
             p.life-=dt;p.mesh.position.addInPlace(p.velocity.scale(dt));
             if(p.kind==='debris'||p.kind==='spark')p.velocity.y-=9*dt;
+            if(p.kind==='debris'){p.mesh.rotation.x+=dt*5;p.mesh.rotation.z+=dt*3;}
+            if(p.kind==='spark')p.mesh.rotation.set(Math.atan2(-p.velocity.y,Math.hypot(p.velocity.x,p.velocity.z)),Math.atan2(p.velocity.x,p.velocity.z),0);
             if(p.kind==='smoke')p.mesh.scaling.scaleInPlace(1+dt*.9);
             if(p.kind==='blast')p.mesh.scaling.scaleInPlace(1+dt*10);
             p.mesh.visibility=Math.max(0,p.life/p.duration);
             if(p.life<=0||p.mesh.position.y<0){p.mesh.dispose();return false;}return true;
         });
+        this.explosionTime=Math.max(0,this.explosionTime-dt);this.explosion.intensity=8*(this.explosionTime/.22);
         this.shotFlash=Math.max(0,this.shotFlash-dt);this.flash.setEnabled(this.shotFlash>0);
         this.muzzle.intensity=this.shotFlash>0?4:0;this.muzzle.position.copyFrom(this.camera.position);
         this.recoil=Math.max(0,this.recoil-dt*.5);this.weapon.position.z=1.05-this.recoil;
@@ -233,13 +312,16 @@ export class Arena {
     setQuality(value:string) {
         const mobile=matchMedia('(pointer:coarse)').matches;
         const low=value==='low'||(value==='auto'&&mobile);
+        this.lowQuality=low;this.details.setEnabled(!low);this.explosion.setEnabled(!low);
+        this.bodies.forEach(body=>body.details.setEnabled(!low));
+        while(this.sparks.length>(low?64:160))this.sparks.shift()!.mesh.dispose();
         this.engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/(low?1:1.7)));
         this.shadow.getShadowMap()?.resize(low?512:1024);this.engine.resize();
     }
     reset() {
         this.bodies.forEach(body=>{body.meshes.forEach(mesh=>this.shadow.removeShadowCaster(mesh));body.root.dispose();body.paint.dispose();});this.bodies.clear();
         this.rounds.forEach(mesh=>mesh.dispose());this.rounds.clear();this.sparks.forEach(p=>p.mesh.dispose());this.sparks=[];
-        this.shotFlash=this.recoil=0;
+        this.shotFlash=this.recoil=this.explosionTime=0;this.explosion.intensity=0;this.muzzle.intensity=0;this.flash.setEnabled(false);
     }
     render(){this.scene.render();}
 }
