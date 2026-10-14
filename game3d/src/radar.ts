@@ -61,7 +61,7 @@ export class Radar {
                 ctx.arc(point.x, point.y, 7 + Math.sin(enemy.age * 6), 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
             }
             ctx.beginPath();
-            if (enemy.kind === 'heavy') {
+            if (enemy.kind === 'boss'){ctx.rect(point.x-6,point.y-6,12,12);} else if (enemy.kind === 'heavy') {
                 ctx.moveTo(point.x, point.y - 4.5); ctx.lineTo(point.x + 4.5, point.y);
                 ctx.lineTo(point.x, point.y + 4.5); ctx.lineTo(point.x - 4.5, point.y); ctx.closePath();
             } else ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);

@@ -1,4 +1,4 @@
-import { Siege, STATION, SPAWN_RADIUS, DIFFICULTIES, UPGRADE_COSTS, KILL_POINTS, WAVE_BONUS, segmentHit, aimDirection, flightHeight, flightMotion, UPGRADES, type Enemy } from './src/model.ts';
+import { Siege, STATION, SPAWN_RADIUS, DIFFICULTIES, UPGRADE_COSTS, KILL_POINTS, WAVE_BONUS, FLAWLESS_BONUS, bossCore, waveEncounter, segmentHit, aimDirection, flightHeight, flightMotion, UPGRADES, type Enemy } from './src/model.ts';
 import { radarPoint, radarSector } from './src/radar.ts';
 import { AimSmoother } from './src/controls.ts';
 import { targetFeedback } from './src/feedback.ts';
@@ -29,7 +29,7 @@ const breaches=new Siege();breaches.start();breaches.enemies=[target(1,1,0,7),ta
 assert(breaches.health===1&&breaches.phase==='combat'&&breaches.enemies.length===0,'Two breaches keep combat running');
 breaches.enemies=[target(3,1,0,7)];breaches.tick(.025);assert(breaches.health===0&&breaches.phase==='lost','Third breach ends combat');
 const frozen=breaches.elapsed;advance(breaches,10);assert(breaches.elapsed===frozen,'Lost-state time freezes');
-const waves=new Siege();waves.start();waves.health=2;waves.spawned=waves.waveSize;waves.enemies=[target(50)];waves.tick(.025);
+const waves=new Siege();waves.start();waves.health=2;waves.waveBreaches=1;waves.spawned=waves.waveSize;waves.enemies=[target(50)];waves.tick(.025);
 assert(waves.phase==='combat','Surviving enemies prevent wave completion');waves.enemies=[];waves.tick(.025);
 assert(waves.phase==='resupply'&&waves.health===3,'Clearing repairs and enters resupply');
 const elapsed=waves.elapsed;assert(!waves.fire(),'No firing during resupply');assert(!waves.nextWave(),'Rest is required before continuing');
@@ -128,7 +128,7 @@ console.log('PASS: low-frame-rate resupply readiness and combat time cap.');
 
 assert(SPAWN_RADIUS===65&&Math.abs(Math.hypot(g.enemies[0].x,g.enemies[0].z)-SPAWN_RADIUS)<1,'Drones spawn at the extended edge');
 const skipShop=new Siege();skipShop.start();clearWave(skipShop);skipShop.tick(4);
-assert(skipShop.nextWave()&&skipShop.points===WAVE_BONUS,'Player can save points and continue without buying');
+assert(skipShop.nextWave()&&skipShop.points===WAVE_BONUS+FLAWLESS_BONUS,'Player can save points and continue without buying');
 const outsideShop=new Siege();outsideShop.points=1000;
 assert(!outsideShop.upgrade('beam'),'Cannot purchase before playing');outsideShop.start();assert(!outsideShop.upgrade('beam'),'Cannot purchase during combat');
 for(const kind of ['scout','armored','heavy'] as const){
@@ -275,3 +275,47 @@ aimAtPractice();training.game.tick(.01);assert(training.game.fire(),'Second prac
 assert(training.stage==='complete'&&training.game.phase==='combat','Training finishes without opening the shop or defeat');
 const freshRun=new Siege();freshRun.start();assert(freshRun.kills===0&&freshRun.points===0&&freshRun.wave===1,'A fresh run has no practice rewards');
 console.log('PASS: playable introduction, safe practice, reveal/kill progression and isolated run state.');
+
+{
+assert([1,2,3,4,5,10].map(waveEncounter).join(',')==='standard,swarm,pincer,blackout,boss,boss','Encounter cycle and fifth-wave bosses');
+const perfect=new Siege();perfect.start();perfect.waveSize=perfect.spawned=1;perfect.enemies=[target(801)];
+perfect.pitch=Math.atan2(STATION.y-perfect.enemies[0].y,20);perfect.fire();advance(perfect,.5);
+assert(perfect.lastResult?.flawless&&perfect.lastResult.kills===1&&perfect.lastResult.hits===1&&perfect.lastResult.shots===1,'Results count real kills and direct hits');
+assert(perfect.points===80&&perfect.lastResult?.points===80,'Kill, clear and flawless rewards are included exactly once');
+const snapshot=perfect.lastResult!;perfect.tick(4);perfect.upgrade('brightness');assert(snapshot.points===80&&perfect.lastResult===snapshot,'Purchases do not mutate wave results');
+perfect.nextWave();assert(perfect.waveShots===0&&perfect.waveHits===0&&perfect.wavePoints===0&&perfect.lastResult===null,'Next wave resets results counters');
+const damaged=new Siege();damaged.start();damaged.waveSize=damaged.spawned=1;damaged.enemies=[target(1,1,0,7)];damaged.tick(.025);
+assert(damaged.lastResult?.breaches===1&&!damaged.lastResult.flawless&&damaged.points===20,'Breached wave has no flawless bonus');
+const miss=new Siege();miss.start();miss.spawned=miss.waveSize;miss.enemies=[target(9,1,20,0)];miss.fire();advance(miss,1.4);assert(miss.waveShots===1&&miss.waveHits===0,'Misses lower accuracy');
+const swarm=new Siege(()=>.2);swarm.wave=2;swarm.start();advance(swarm,3.2);assert(swarm.spawned===3,'First swarm arrives as a tight group');
+assert(swarm.enemies.every(e=>Math.abs(Math.atan2(e.x,e.z)-Math.atan2(swarm.enemies[0].x,swarm.enemies[0].z))<.3),'Swarm approaches are clustered');
+const twoFront=new Siege(()=>.25);twoFront.wave=3;twoFront.start();advance(twoFront,5.1);assert(twoFront.enemies.length>=2,'Two-front wave spawns both sectors');
+assert(twoFront.enemies[0].x*twoFront.enemies[1].x+twoFront.enemies[0].z*twoFront.enemies[1].z<0,'Pincer sectors are opposite');
+const dark=new Siege();dark.wave=4;dark.start();dark.spawned=dark.waveSize;dark.enemies=[target(2,1,0,30)];dark.waveElapsed=7.99;dark.tick(.025);
+assert(dark.blackoutActive&&dark.searchlightIntensity===0,'Scheduled blackout cuts the searchlight');
+dark.setPaused(true);const darkTime=dark.waveElapsed;dark.tick(10);assert(dark.waveElapsed===darkTime&&dark.blackoutActive,'Pause freezes blackout');
+dark.setPaused(false);assert(dark.fire(),'Weapons remain active in blackout');dark.waveElapsed=12;dark.tick(.025);assert(!dark.blackoutActive&&dark.searchlightIntensity>0,'Light returns after blackout');
+const carrier=new Siege(()=>.25);carrier.wave=5;carrier.start();advance(carrier,2.55);const carrierTarget=carrier.enemies.find(e=>e.kind==='boss')!;
+assert(carrierTarget&&carrierTarget.hp===10,'Wave five opens with a ten-HP carrier');carrierTarget.speed=0;
+const initialSize=carrier.waveSize;advance(carrier,16.5);
+assert(carrierTarget.launches===2&&carrier.waveSize===initialSize+2,'Carrier deployments are bounded and included in wave totals');
+const deployedSize=carrier.waveSize;advance(carrier,5);assert(carrier.waveSize===deployedSize,'Carrier cannot deploy indefinitely');
+function carrierHit(core:boolean){
+ const g=new Siege();g.start();g.spawned=g.waveSize;const enemy={...target(400,10,0,20),kind:'boss' as const,radius:2.4,maxHp:10};enemy.y=flightHeight('boss',0,enemy.id);g.enemies=[enemy];
+ const pos=core?bossCore(enemy):enemy;g.yaw=Math.atan2(pos.x,pos.z);g.pitch=Math.atan2(STATION.y-pos.y,Math.hypot(pos.x,pos.z));g.fire();advance(g,.5);return {g,enemy};
+}
+const bodyHit=carrierHit(false),coreHit=carrierHit(true);
+assert(bodyHit.enemy.hp===9&&coreHit.enemy.hp===8,'Carrier core takes double direct damage');
+assert(coreHit.g.drainEvents().some(e=>e.kind==='hit'&&e.weak),'Core hit produces distinct feedback');
+const splashCount=new Siege();splashCount.start();splashCount.spawned=splashCount.waveSize;splashCount.blastRadius=4;splashCount.enemies=[target(1),target(2,1,2,20)];splashCount.pitch=Math.atan2(STATION.y-splashCount.enemies[0].y,20);splashCount.fire();advance(splashCount,.5);
+assert(splashCount.waveHits===1&&splashCount.waveKills===2,'Splash kills do not inflate direct-shot accuracy');
+assert(coreHit.g.waveHits===1,'Double-damage core hit counts as one accurate shot');
+const bossReward=carrierHit(true);bossReward.enemy.hp=1;bossReward.g.cooldown=0;bossReward.g.fire();advance(bossReward.g,.5);
+assert(bossReward.g.kills===1&&bossReward.g.points===KILL_POINTS.boss+WAVE_BONUS+FLAWLESS_BONUS,'Carrier kill reward and wave bonuses are paid once');
+const splashBoss=new Siege();splashBoss.start();splashBoss.blastRadius=4;splashBoss.spawned=splashBoss.waveSize;
+const splashCarrier={...target(33,10,3.5,20),kind:'boss' as const,radius:2.4,maxHp:10};splashCarrier.y=flightHeight('boss',0,33);
+splashBoss.enemies=[target(32),splashCarrier];splashBoss.pitch=Math.atan2(STATION.y-splashBoss.enemies[0].y,20);splashBoss.fire();advance(splashBoss,.5);
+assert(splashCarrier.hp===9&&splashBoss.waveHits===1,'Splash damages the carrier without weak-point multiplication');
+console.log('PASS: flawless/results accounting, encounter cycle, swarms, pincer, blackout pause/restore, carrier deployments and weak-point damage.');
+
+}
