@@ -21,3 +21,12 @@
 #screen .card{max-width:520px;margin:auto}#screen.overlay{align-items:flex-start}.openingRules{text-align:left;border-top:1px solid #52616d88;border-bottom:1px solid #52616d88;padding:16px 0;margin:20px 0}.openingRules h2{font:24px Georgia,serif;color:#efd7a9;margin:0 0 12px}.openingRules ul{padding-left:20px;margin:0}.openingRules li{font-size:14px;line-height:1.5;color:#acbfce;margin:0 0 10px}.openingRules li:last-child{margin-bottom:0}.openingRules strong{color:#e7edf0}@media(max-width:480px){#screen .card{padding:22px}.openingRules li{font-size:13px}}
 
 .upgradeChoices button:last-child{grid-column:auto}
+
+.openingRules summary{cursor:pointer;color:#efd7a9;font-size:15px}.openingRules[open] summary{margin-bottom:14px}
+#introGuide{position:fixed;left:16px;top:110px;width:min(330px,calc(100vw - 32px));padding:16px;background:#0b1a27ed;border:1px solid #c9ad74;border-radius:10px;z-index:2}
+#introGuide h2{font:20px Georgia,serif;color:#efd7a9;margin:8px 0}#introGuide p{font-size:14px;line-height:1.5;margin:10px 0;color:#d2e0e8}
+.trainingRadar{outline:3px solid #efd7a9;outline-offset:4px}
+@media(max-width:600px){#introGuide{top:auto;bottom:calc(160px + env(safe-area-inset-bottom));left:12px;width:calc(100vw - 24px);padding:10px 14px}#introGuide p{font-size:12px;margin:6px 0}#introGuide h2{font-size:17px;margin:5px 0}#introGuide .eyebrow{font-size:9px}}
+@media(max-height:520px) and (min-width:601px){#introGuide{top:80px;width:260px;padding:10px}#introGuide p{font-size:12px}}
+
+#hud.practicing .bottomline{display:none}

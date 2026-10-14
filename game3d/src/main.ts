@@ -1,3 +1,4 @@
+import { PlayableIntro } from './intro';
 import { droneSoundSources } from './droneAudio';
 import './style.css';
 import { Arena } from './arena';
@@ -19,6 +20,32 @@ const difficultySelect = el<HTMLSelectElement>('difficulty');
 const settings = el<HTMLDialogElement>('settings'),resupply = el<HTMLDialogElement>('resupply'),defeat = el<HTMLDialogElement>('defeat');
 let game = new Siege(), arena: Arena | null = null;
 const audio = new GameAudio();
+let intro:PlayableIntro|null=null;
+let introSeen=false;
+try{introSeen=localStorage.getItem('night-siege-3d-intro-v1')==='done';}catch{}
+function updateIntro(){
+    el('introGuide').hidden=!intro;el('hud').classList.toggle('practicing',!!intro);
+    if(!intro)return;
+    const titles={aim:'1 / 3 · Sweep the searchlight',shoot:'2 / 3 · Shoot the drone',radar:'3 / 3 · Follow the radar',complete:'Training complete'};
+    el('introTitle').textContent=titles[intro.stage];el('introMessage').textContent=intro.message;
+    el('introContinueBtn').hidden=intro.stage!=='complete';
+    el('introSkipBtn').hidden=intro.stage==='complete';
+    el('radarPanel').classList.toggle('trainingRadar',intro.stage==='radar');
+}
+function beginRun(){
+    if(!arena)return;
+    intro=null;updateIntro();el('radarPanel').classList.remove('trainingRadar');
+    arena?.reset();game=new Siege(Math.random,difficultySelect.value as Difficulty);startSession();
+}
+function startSession(){
+    clearInput();game.start();hitUntil=damageUntil=0;lastWarning=-9;lastStep=0;el('targetFeedback').textContent='';el('screen').classList.add('hidden');lastTime=performance.now();void audio.unlock();
+    canvas.focus();updateHud();
+}
+function practice(){
+    if(!arena)return;
+    arena.reset();intro=new PlayableIntro();game=intro.game;startSession();updateIntro();
+}
+
 let lastTime = performance.now(), sensitivity = 1, toastUntil = 0, hitUntil = 0, damageUntil = 0, lastStep = 0, lastWarning = -9;
 const held = {left:false,right:false,up:false,down:false,fire:false};
 let drag: {id:number;x:number;y:number;distance:number} | null = null;
@@ -53,9 +80,7 @@ function shoot(){
 }
 function start(){
     if(!arena)return;
-    if(game.phase==='ready')game=new Siege(Math.random,difficultySelect.value as Difficulty);
-    clearInput();game.start();hitUntil=damageUntil=0;lastWarning=-9;el('targetFeedback').textContent='';el('screen').classList.add('hidden');lastTime=performance.now();void audio.unlock();
-    canvas.focus();toast('Stay at your gun. Sweep the darkness.');updateHud();
+    if(!introSeen)practice();else beginRun();
 }
 function saveBest(){
     const result={wave:game.wave,kills:game.kills,time:Math.floor(game.elapsed)};
@@ -65,9 +90,9 @@ function saveBest(){
     showBest();
 }
 function updateHud(){
-    el('points').textContent=String(game.points);
+    el('points').textContent=intro?'—':String(game.points);
     el<HTMLButtonElement>('pauseBtn').disabled=game.phase!=='combat'&&game.phase!=='resupply';
-    el('wave').textContent=String(game.wave);el('health').textContent=`${game.health} / 3`;
+    el('wave').textContent=intro?'Practice':String(game.wave);el('health').textContent=`${game.health} / 3`;
     el('ammo').textContent=`${game.capacity-game.bullets.length} / ${game.capacity}`;
     el('gunStatus').textContent=game.bullets.length>=game.capacity?'IN FLIGHT':game.cooldown>0?'CYCLING':'READY';
     const jamBtn=el<HTMLButtonElement>('jamBtn');jamBtn.hidden=!game.jammerOwned;
@@ -83,7 +108,7 @@ function updateHud(){
     el('bearing').textContent=`${points[Math.round(degrees/45)%8]} · ${String(degrees).padStart(3,'0')}°`;
     el('radarTargets').textContent=`${game.enemies.length} ${game.enemies.length===1?'target':'targets'}`;
     radarCanvas.setAttribute('aria-label',`Radar: ${game.enemies.length} approaching targets. Searchlight bearing ${degrees} degrees. North is up.`);
-    const threat=game.threat;el('threatIndicator').hidden=!threat;
+    const threat=game.threat;el('threatIndicator').hidden=!!intro||!threat;
     if(threat){
         const side=Math.abs(threat.bearing)>Math.PI*.65?'behind':threat.bearing<-.3?'left':threat.bearing>.3?'right':'ahead';
         const label=`Drone closing from ${side}`;if(el('threatText').textContent!==label)el('threatText').textContent=label;
@@ -112,13 +137,13 @@ function consumeEvents(){
         if(event.kind==='blast')audio.effect('explosion');
         if(event.kind==='pulse'){audio.effect('clear');toast('Jammer active · drones slowed for 4 seconds');}
         if(event.kind==='breach'){audio.effect('breach');damageUntil=performance.now()+550;toast(`${game.health} castle health remaining`);}
-        if(event.kind==='clear'){
+        if(event.kind==='clear'&&!intro){
             clearInput();audio.effect('clear');el('waveTitle').textContent=`Wave ${game.wave} cleared`;
             el('repairText').textContent=`One castle health restored, up to three. Spend earned points on upgrades, or save them for later.`;
             document.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button=>button.disabled=!game.canUpgrade(button.dataset.upgrade as Upgrade));
             resupply.showModal();
         }
-        if(event.kind==='lost'){
+        if(event.kind==='lost'&&!intro){
             clearInput();saveBest();el('result').textContent=`${game.rules.label} · Wave ${game.wave} · ${game.kills} kills · ${game.earnedPoints} points earned · ${formatTime(game.elapsed)} in combat`;
             defeat.showModal();
         }
@@ -127,6 +152,14 @@ function consumeEvents(){
     if(feedback){hitUntil=performance.now()+feedback.duration;el('targetFeedback').textContent=feedback.text;}
 }
 el('startBtn').addEventListener('click',start);
+el('practiceBtn').addEventListener('click',practice);
+el('skipOpeningBtn').addEventListener('click',beginRun);
+el('introSkipBtn').addEventListener('click',beginRun);
+el('introContinueBtn').addEventListener('click',()=>{
+    if(intro?.stage!=='complete')return;
+    introSeen=true;try{localStorage.setItem('night-siege-3d-intro-v1','done');}catch{}
+    beginRun();
+});
 function jam(){if(blocked())return;void audio.unlock();if(game.pulse()){consumeEvents();updateHud();}}
 el('jamBtn').addEventListener('click',jam);
 el('restartBtn').addEventListener('click',()=>{defeat.close();arena?.reset();game=new Siege(Math.random,game.difficulty);lastStep=0;start();});
@@ -217,7 +250,7 @@ window.addEventListener('resize',()=>{arena?.engine.resize();radar.resize();});
 soundStatus();showBest();updateHud();
 try{
     arena=new Arena(canvas);
-    el<HTMLButtonElement>('startBtn').disabled=false;el('startBtn').textContent='Take your position';
+    el<HTMLButtonElement>('startBtn').disabled=false;el('startBtn').textContent=introSeen?'Take your position':'Learn to defend · Play intro';
     const render=()=>{
         const now=performance.now(),elapsed=Math.max(0,(now-lastTime)/1000),dt=Math.min(.05,elapsed);lastTime=now;
         if(!document.hidden&&!settings.open&&!game.paused){
@@ -225,12 +258,12 @@ try{
                 const smooth=touchAim.take(dt);game.aim(smooth.x,smooth.y);
                 game.aim(((held.right?1:0)-(held.left?1:0))*game.turnSpeed*dt,((held.down?1:0)-(held.up?1:0))*game.turnSpeed*.45*dt);
                 if(aimAssist&&(drag||held.fire))game.assistAim(dt);
-                game.tick(dt);if(held.fire&&game.cooldown===0)shoot();consumeEvents();
+                game.tick(dt);if(intro){intro.update();updateIntro();}if(held.fire&&game.cooldown===0)shoot();consumeEvents();
                 if(game.elapsed-lastStep>.26){
                     for(const source of droneSoundSources(game.enemies,game.yaw))audio.drone(source.pan,source.strength,source.pitch);
                     lastStep=game.elapsed;
                 }
-                const threat=game.threat;if(threat&&game.elapsed-lastWarning>1.4){audio.effect('warning',Math.sin(threat.bearing));lastWarning=game.elapsed;}
+                const threat=game.threat;if(!intro&&threat&&game.elapsed-lastWarning>1.4){audio.effect('warning',Math.sin(threat.bearing));lastWarning=game.elapsed;}
             } else game.tick(elapsed);
         }
         arena!.update(game,document.hidden||settings.open||game.paused?0:dt);arena!.render();radar.draw(game);updateHud();

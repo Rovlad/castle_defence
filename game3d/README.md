@@ -6,6 +6,8 @@ The player stays at `(0, 5.8, 0)` on the turret. Aim rotates yaw and pitch; no i
 
 ## Play
 
+First-time players enter a short, safe playable introduction: sweep right to reveal a stationary practice drone, shoot it, then use the radar to find a second drone outside the beam. Complete training to begin a fresh wave 1; practice rewards and time do not carry over. Completion is remembered locally. Skip directly into combat or replay using Practice controls. Full rules remain available in a collapsed opening-screen section.
+
 The committed build is served at `/castle_defence/3d/` on GitHub Pages once merged and deployed. It must be served over HTTP; opening the module bundle through `file://` is unsupported.
 
 - Desktop: drag the mouse or hold arrow keys to aim; click or hold Space to fire. Once equipped, press P or tap the radar's JAM button to activate the jammer.
