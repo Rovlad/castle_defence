@@ -64,8 +64,22 @@
   <div class="settingRow"><label for="aimAssist">Gentle aim assistance</label><input id="aimAssist" type="checkbox"></div>
   <div class="settingRow"><label for="quality">Graphics</label><select id="quality"><option value="auto">Automatic</option><option value="low">Low</option><option value="high">High</option></select></div>
   <button id="closeSettingsBtn" class="primary">Done</button></dialog>
-<dialog id="resupply"><span class="eyebrow">RESUPPLY</span><h2 id="waveTitle">Wave cleared</h2><p id="repairText"></p><div class="shopToolbar"><p id="shopBalance" role="status"></p><button id="shopPauseBtn" class="textButton">Pause game</button></div>
-  <div class="shopItems"><section class="waveSummary" aria-label="Wave results"><p id="waveResults"></p><p id="flawlessBonus"></p><p id="nextEncounter"></p></section><div class="upgradeChoices"><button data-upgrade="beam"><b>Wider searchlight</b><small>Reveal more of the darkness.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="beam" role="img"></span><span class="levelCaption" data-level="beam"></span></span><span class="upgradeCondition" data-current="beam"></span><span class="upgradePrice" data-price="beam"></span></button>
+<dialog id="resupply"><span class="eyebrow">MISSION DEBRIEF · REARM &amp; REDEPLOY</span><h2 id="waveTitle">Wave cleared</h2><p id="repairText"></p><div class="shopToolbar"><div class="creditWallet"><span class="creditCoin" aria-hidden="true">✦</span><div><span class="eyebrow">UPGRADE CREDITS</span><strong id="shopBalance" role="status"></strong></div></div><button id="shopPauseBtn" class="textButton">Pause game</button></div>
+  <div class="shopItems"><section class="waveSummary" aria-label="Mission debrief">
+    <div class="debriefHero">
+      <svg class="debriefShield" viewBox="0 0 64 72" aria-hidden="true"><path d="M32 3 59 14v22c0 16-13 26-27 33C18 62 5 52 5 36V14Z"/><path class="shieldMark" d="m19 34 9 9 18-21"/></svg>
+      <div><span class="eyebrow">DEFENCE REPORT</span><h3 id="defenceRating"></h3><p id="defenceDetail"></p></div>
+      <span id="flawlessBonus" class="bonusBadge"></span>
+    </div>
+    <div id="waveResults" class="debriefStats" aria-label="Wave performance">
+      <div class="debriefStat"><span>DRONES DOWN</span><strong id="resultKills"></strong><small>Targets eliminated</small></div>
+      <div class="debriefStat"><span>BREACHES</span><strong id="resultBreaches"></strong><small>Perimeter crossings</small></div>
+      <div class="debriefStat"><span>ACCURACY</span><strong id="resultAccuracy"></strong><small id="resultHits"></small></div>
+      <div class="debriefStat"><span>COMBAT TIME</span><strong id="resultTime"></strong><small>Resupply excluded</small></div>
+    </div>
+    <div class="earnedReward"><span>MISSION PAYOUT</span><strong id="resultPoints"></strong><small>POINTS EARNED</small></div>
+    <div class="nextMission"><div class="missionRadar" aria-hidden="true"><i></i></div><div><span class="eyebrow" id="nextWaveLabel"></span><h3 id="nextEncounterTitle"></h3><p id="nextEncounter"></p></div></div>
+  </section><h3 class="armoryHeading">REARM YOUR TURRET</h3><div class="upgradeChoices"><button data-upgrade="beam"><b>Wider searchlight</b><small>Reveal more of the darkness.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="beam" role="img"></span><span class="levelCaption" data-level="beam"></span></span><span class="upgradeCondition" data-current="beam"></span><span class="upgradePrice" data-price="beam"></span></button>
     <button data-upgrade="brightness"><b>Brighter searchlight</b><small>+50% starting brightness per level, up to 2.5×.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="brightness" role="img"></span><span class="levelCaption" data-level="brightness"></span></span><span class="upgradeCondition" data-current="brightness"></span><span class="upgradePrice" data-price="brightness"></span></button>
     <button data-upgrade="turn"><b>Faster turret</b><small>Turn and track enemies faster.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="turn" role="img"></span><span class="levelCaption" data-level="turn"></span></span><span class="upgradeCondition" data-current="turn"></span><span class="upgradePrice" data-price="turn"></span></button>
     <button data-upgrade="ammo"><b>Extra ammunition</b><small>Add a bullet slot, up to six.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="ammo" role="img"></span><span class="levelCaption" data-level="ammo"></span></span><span class="upgradeCondition" data-current="ammo"></span><span class="upgradePrice" data-price="ammo"></span></button>
