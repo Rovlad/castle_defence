@@ -213,3 +213,39 @@ for(const [yaw,pitch] of [[0,.1],[Math.PI/2,.1],[Math.PI,.1],[-Math.PI/2,-.28],[
 }
 engine.dispose();
 console.log('PASS: Babylon searchlight projection follows repeated yaw and pitch changes.');
+
+const { droneSoundSources } = await import('./src/droneAudio.ts');
+const audioTargets=[target(1001,1,65,0),target(1002,1,-20,0)];
+let sources=droneSoundSources(audioTargets,0);
+assert(sources.length===2&&sources[0].pan===-1&&sources[1].pan===1,'Separate left and right drones remain audible');
+assert(sources[0].strength>sources[1].strength,'Nearer drones are louder');
+assert(droneSoundSources([target(1,1,0,20)],Math.PI/2)[0].pan===-1,'Panning follows turret heading');
+assert(droneSoundSources([target(1,1,8,0)],0)[0].strength===1,'Breach distance reaches full rotor volume');
+assert(droneSoundSources([target(1,1,66,0)],0).length===0,'Sources beyond the arena are excluded');
+assert(droneSoundSources(Array.from({length:8},(_,i)=>target(i,1,10+i,0)),0).length===3,'Drone source count is bounded');
+assert(droneSoundSources([{...target(1),kind:'heavy'}],0)[0].pitch<droneSoundSources([target(1)],0)[0].pitch,'Heavy drones have lower rotor pitch');
+console.log('PASS: multiple drone sources, approach volume, relative stereo, pitch and source cap.');
+
+const { GameAudio } = await import('./src/audio.ts');
+Object.defineProperty(globalThis,'document',{value:{hidden:false},configurable:true});
+const rotorAudio=new GameAudio();rotorAudio.muted=false;
+const ramps:number[]=[];const pans:number[]=[];const pitches:number[]=[];let starts=0,disconnects=0;
+const ended:Array<()=>void>=[];
+const node=()=>({connect(){},disconnect(){disconnects++;}});
+const parameter=()=>({value:0,setValueAtTime(){},exponentialRampToValueAtTime(value:number){ramps.push(value);}});
+rotorAudio.master=node() as unknown as GainNode;
+rotorAudio.context={state:'running',currentTime:0,
+    createOscillator(){const osc={...node(),type:'',frequency:{setValueAtTime(value:number){pitches.push(value);},exponentialRampToValueAtTime(){}},onended:()=>{},start(){starts++;},stop(){ended.push(()=>osc.onended());}};return osc;},
+    createGain(){return {...node(),gain:parameter()};},
+    createStereoPanner(){return {...node(),pan:{set value(value:number){pans.push(value);}}};}
+} as unknown as AudioContext;
+rotorAudio.drone(-.75,.8,135);
+assert(starts===2&&pans.every(pan=>pan===-.75)&&pitches[1]>pitches[0],'Rotor layers preserve source pan and motor whine');
+assert(ramps.length>20,'Blade-pass pulses are scheduled');
+for(let i=0;i<20;i++)rotorAudio.drone(0,1,165);
+assert(starts===18,'Synthesized voices stay bounded');
+ended.forEach(end=>end());assert(disconnects===54,'Rotor oscillators, gains and panners disconnect');
+rotorAudio.muted=true;rotorAudio.drone(0,1,165);assert(starts===18,'Muted rotors remain silent');
+rotorAudio.muted=false;(document as unknown as {hidden:boolean}).hidden=true;rotorAudio.drone(0,1,165);assert(starts===18,'Hidden pages do not schedule rotors');
+delete (globalThis as {document?:Document}).document;
+console.log('PASS: rotor layers, blade pulses, stereo, voice limit, cleanup, mute and hidden-page silence.');

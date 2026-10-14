@@ -25,23 +25,35 @@ export class GameAudio {
         if(this.master && this.context)this.master.gain.setValueAtTime(this.muted?0:.2,this.context.currentTime);
         if(!this.muted)void this.unlock();
     }
-    tone(frequency:number,duration:number,volume:number,type:OscillatorType='triangle',pan=0,end=frequency) {
+    tone(frequency:number,duration:number,volume:number,type:OscillatorType='triangle',pan=0,end=frequency,rotor=false) {
         const ctx = this.context;
-        if(this.muted || !ctx || ctx.state!=='running' || !this.master || document.hidden || this.voices>=10)return;
+        if(this.muted || !ctx || ctx.state!=='running' || !this.master || document.hidden || this.voices>=18)return;
         const osc=ctx.createOscillator(),gain=ctx.createGain(),panner=ctx.createStereoPanner?.();
         const now=ctx.currentTime,generation=this.generation;
         osc.type=type;osc.frequency.setValueAtTime(frequency,now);osc.frequency.exponentialRampToValueAtTime(Math.max(1,end),now+duration);
-        gain.gain.setValueAtTime(volume,now);gain.gain.exponentialRampToValueAtTime(.001,now+duration);
+        gain.gain.setValueAtTime(rotor?.001:volume,now);
+        if(rotor){
+            gain.gain.exponentialRampToValueAtTime(volume,now+.025);
+            for(let t=.04;t<duration-.06;t+=.025){
+                gain.gain.exponentialRampToValueAtTime(volume*.5,now+t);
+                gain.gain.exponentialRampToValueAtTime(volume,now+t+.0125);
+            }
+        }
+        gain.gain.exponentialRampToValueAtTime(.001,now+duration);
         osc.connect(gain);
         if(panner){panner.pan.value=pan;gain.connect(panner);panner.connect(this.master);}else gain.connect(this.master);
         this.voices++;osc.onended=()=>{if(generation===this.generation)this.voices--;osc.disconnect();gain.disconnect();panner?.disconnect();};
         osc.start();osc.stop(now+duration);
     }
+    drone(pan:number,strength:number,pitch:number) {
+        // Layer blade-pass buzz and electric motor whine; overlapping packets avoid beeps.
+        this.tone(pitch,.32,.20*strength,'sawtooth',pan,pitch,true);
+        this.tone(pitch*3.6,.32,.075*strength,'triangle',pan,pitch*3.55,true);
+    }
     effect(kind:string,pan=0) {
         if(kind==='shot')this.tone(220,.12,.35,'sawtooth',0,60);
         else if(kind==='hit')this.tone(550,.12,.14,'square',pan,180);
         else if(kind==='breach')this.tone(130,.5,.28,'sawtooth',0,35);
-        else if(kind==='engine')this.tone(110,.18,.12,'triangle',pan,95);
         else if(kind==='warning')this.tone(920,.08,.10,'triangle',pan,720);
         else if(kind==='explosion')this.tone(85,.35,.32,'sawtooth',pan,25);
         else {this.tone(440,.28,.16,'sine');this.tone(660,.4,.13,'sine');}
