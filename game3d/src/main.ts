@@ -1,3 +1,4 @@
+import { droneSoundSources } from './droneAudio';
 import './style.css';
 import { Arena } from './arena';
 import { Siege, DIFFICULTIES, UPGRADE_COSTS, type Difficulty, type Upgrade } from './model';
@@ -225,8 +226,10 @@ try{
                 game.aim(((held.right?1:0)-(held.left?1:0))*game.turnSpeed*dt,((held.down?1:0)-(held.up?1:0))*game.turnSpeed*.45*dt);
                 if(aimAssist&&(drag||held.fire))game.assistAim(dt);
                 game.tick(dt);if(held.fire&&game.cooldown===0)shoot();consumeEvents();
-                const nearest=game.enemies.reduce<{x:number;z:number;d:number}|null>((best,e)=>{const d=Math.hypot(e.x,e.z);return !best||d<best.d?{x:e.x,z:e.z,d}:best;},null);
-                if(nearest&&nearest.d<28&&game.elapsed-lastStep>.5){audio.effect('engine',Math.sin(Math.atan2(nearest.x,nearest.z)-game.yaw));lastStep=game.elapsed;}
+                if(game.elapsed-lastStep>.26){
+                    for(const source of droneSoundSources(game.enemies,game.yaw))audio.drone(source.pan,source.strength,source.pitch);
+                    lastStep=game.elapsed;
+                }
                 const threat=game.threat;if(threat&&game.elapsed-lastWarning>1.4){audio.effect('warning',Math.sin(threat.bearing));lastWarning=game.elapsed;}
             } else game.tick(elapsed);
         }
