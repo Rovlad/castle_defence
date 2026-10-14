@@ -32,3 +32,10 @@
 #hud.practicing .bottomline{display:none}
 
 .upgradeCondition{display:block;color:#e7d8b5;font-size:12px;font-weight:400;margin-top:9px;line-height:1.5}
+
+.upgradeMeter{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:12px}
+.levelBattery{display:flex;position:relative;gap:3px;padding:4px;border:1px solid #648295;border-radius:4px;max-width:100%;width:100%;height:22px;margin-right:4px;background:#081923}
+.levelBattery::after{content:"";position:absolute;right:-4px;top:6px;width:3px;height:8px;background:#648295;border-radius:0 2px 2px 0}
+.levelBattery i{display:block;flex:1;min-width:0;border-radius:1px;background:#263e4c}.levelBattery i.charged{background:linear-gradient(#f8df9f,#cd9a48);box-shadow:0 0 5px #edc37a33}
+.levelBattery.full{border-color:#75bfa8}.levelBattery.full::after{background:#75bfa8}.levelBattery.full i.charged{background:linear-gradient(#a0e4bd,#4ba789)}
+.levelCaption{font-size:10px;letter-spacing:.8px;font-weight:700;color:#d8c8a3}.upgradeCondition{margin-top:5px}

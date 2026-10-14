@@ -1,3 +1,4 @@
+import { upgradeLevel } from './upgradeLevels';
 import { PlayableIntro } from './intro';
 import { droneSoundSources } from './droneAudio';
 import './style.css';
@@ -123,18 +124,28 @@ function updateHud(){
         el('resupplyStatus').textContent=wait>0?`Resupply: ${wait}s · Buy upgrades or save your points`:'Ready when you are. Purchases are optional.';
         el('shopBalance').textContent=`Available: ${game.points} points`;
         const conditions:Record<Upgrade,string>={
-            beam:`Current: ${Math.round(game.beam*180/Math.PI)}° beam · Max 90°`,
-            brightness:`Current: ${(1+game.brightnessLevel*.5).toFixed(1)}× brightness · Level ${game.brightnessLevel} / 3`,
-            turn:`Current: ${Math.round(game.turnSpeed*180/Math.PI)}°/s turn speed · Max ${Math.round(2.9*180/Math.PI)}°/s`,
-            ammo:`Current: ${game.capacity} bullet slots · Max 6`,
-            damage:`Current: ${game.damage} damage per hit · Max 3`,
-            velocity:`Current: ${game.projectileSpeed}m/s rounds · Max 100m/s`,
-            blast:game.blastRadius?`Current: Equipped · 1 splash damage within ${game.blastRadius}m`:'Current: Not equipped · Direct hits only',
-            jammer:game.jammerOwned?'Current: Equipped · 4s slow, 18s recharge':'Current: Not equipped'
+            beam:`${Math.round(game.beam*180/Math.PI)}° beam`,
+            brightness:`${(1+game.brightnessLevel*.5).toFixed(1)}× brightness`,
+            turn:`${Math.round(game.turnSpeed*180/Math.PI)}°/s turn speed`,
+            ammo:`${game.capacity} bullet slots`,
+            damage:`${game.damage} damage per hit`,
+            velocity:`${game.projectileSpeed}m/s rounds`,
+            blast:game.blastRadius?`Equipped · 1 splash damage within ${game.blastRadius}m`:'Not equipped · Direct hits only',
+            jammer:game.jammerOwned?'Equipped · 4s slow, 18s recharge':'Not equipped'
         };
         document.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button=>{
             const kind=button.dataset.upgrade as Upgrade,cost=UPGRADE_COSTS[kind],maxed=!game.canUpgrade(kind);
             button.disabled=game.paused||maxed||game.points<cost;
+            const {level,max}=upgradeLevel(game,kind);
+            const meter=button.querySelector<HTMLElement>('[data-meter]')!,caption=button.querySelector('[data-level]')!;
+            if(meter.dataset.value!==String(level)){
+                meter.dataset.value=String(level);meter.classList.toggle('full',level===max);
+                meter.setAttribute('aria-label',max===1?(level?'Equipped':'Not equipped'):`Upgrade level ${level} of ${max}`);
+                meter.replaceChildren(...Array.from({length:max},(_,i)=>{
+                    const segment=document.createElement('i');segment.className=i<level?'charged':'';segment.setAttribute('aria-hidden','true');return segment;
+                }));
+                caption.textContent=max===1?(level?'EQUIPPED':'NOT EQUIPPED'):level===max?'MAX LEVEL':level===0?'BASE LEVEL':`LEVEL ${level} / ${max}`;
+            }
             const current=button.querySelector('[data-current]')!;
             if(current.textContent!==conditions[kind])current.textContent=conditions[kind];
             button.querySelector('[data-price]')!.textContent=maxed?'MAXED':`${cost} points${game.points<cost?' · Not enough points':''}`;
