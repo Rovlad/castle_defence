@@ -19,6 +19,8 @@ import { Mesh } from '@babylonjs/core/Meshes/mesh';
 const MeshBuilder = { CreateBox, CreateSphere, CreateCylinder, CreateGround };
 import { STATION, aimDirection, type Siege, type Enemy, type GameEvent } from './model';
 
+import { pointSearchlight } from './searchlight';
+
 export class Arena {
     engine: Engine; scene: Scene; camera: FreeCamera; spotlight: SpotLight;
     private shadow: ShadowGenerator; private weapon: TransformNode; private flash: Mesh; private muzzle: PointLight;
@@ -193,7 +195,7 @@ export class Arena {
         this.camera.position.set(STATION.x,STATION.y,STATION.z);
         this.camera.rotation.set(game.pitch,game.yaw,0);
         this.spotlight.intensity=game.searchlightIntensity;
-        const d=aimDirection(game.yaw,game.pitch);this.spotlight.direction.set(d.x,d.y,d.z);this.spotlight.angle=game.beam;
+        const d=aimDirection(game.yaw,game.pitch);pointSearchlight(this.spotlight,d);this.spotlight.angle=game.beam;
         const ids=new Set(game.enemies.map(e=>e.id));
         for(const [id,body] of this.bodies)if(!ids.has(id)){body.meshes.forEach(mesh=>this.shadow.removeShadowCaster(mesh));body.root.dispose();body.paint.dispose();this.bodies.delete(id);}
         for(const enemy of game.enemies) {
