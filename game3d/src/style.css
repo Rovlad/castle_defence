@@ -30,3 +30,5 @@
 @media(max-height:520px) and (min-width:601px){#introGuide{top:80px;width:260px;padding:10px}#introGuide p{font-size:12px}}
 
 #hud.practicing .bottomline{display:none}
+
+.upgradeCondition{display:block;color:#e7d8b5;font-size:12px;font-weight:400;margin-top:9px;line-height:1.5}

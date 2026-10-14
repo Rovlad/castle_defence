@@ -63,14 +63,14 @@
   <div class="settingRow"><label for="quality">Graphics</label><select id="quality"><option value="auto">Automatic</option><option value="low">Low</option><option value="high">High</option></select></div>
   <button id="closeSettingsBtn" class="primary">Done</button></dialog>
 <dialog id="resupply"><span class="eyebrow">RESUPPLY</span><h2 id="waveTitle">Wave cleared</h2><p id="repairText"></p><div class="shopToolbar"><p id="shopBalance" role="status"></p><button id="shopPauseBtn" class="textButton">Pause game</button></div>
-  <div class="shopItems"><div class="upgradeChoices"><button data-upgrade="beam"><b>Wider searchlight</b><small>Reveal more of the darkness.</small><span class="upgradePrice" data-price="beam"></span></button>
-    <button data-upgrade="brightness"><b>Brighter searchlight</b><small>+50% starting brightness per level, up to 2.5×.</small><span class="upgradePrice" data-price="brightness"></span></button>
-    <button data-upgrade="turn"><b>Faster turret</b><small>Turn and track enemies faster.</small><span class="upgradePrice" data-price="turn"></span></button>
-    <button data-upgrade="ammo"><b>Extra ammunition</b><small>Add a bullet slot, up to six.</small><span class="upgradePrice" data-price="ammo"></span></button>
-    <button data-upgrade="damage"><b>Stronger shots</b><small>+1 damage per shot, up to three.</small><span class="upgradePrice" data-price="damage"></span></button>
-    <button data-upgrade="velocity"><b>Faster rounds</b><small>Faster travel and less target leading.</small><span class="upgradePrice" data-price="velocity"></span></button>
-    <button data-upgrade="blast"><b>Explosive shells</b><small>Hits deal 1 splash damage within 4m.</small><span class="upgradePrice" data-price="blast"></span></button>
-    <button data-upgrade="jammer"><b>Radar jammer</b><small>Slow drones for 4s. Recharge: 18s.</small><span class="upgradePrice" data-price="jammer"></span></button></div>
+  <div class="shopItems"><div class="upgradeChoices"><button data-upgrade="beam"><b>Wider searchlight</b><small>Reveal more of the darkness.</small><span class="upgradeCondition" data-current="beam"></span><span class="upgradePrice" data-price="beam"></span></button>
+    <button data-upgrade="brightness"><b>Brighter searchlight</b><small>+50% starting brightness per level, up to 2.5×.</small><span class="upgradeCondition" data-current="brightness"></span><span class="upgradePrice" data-price="brightness"></span></button>
+    <button data-upgrade="turn"><b>Faster turret</b><small>Turn and track enemies faster.</small><span class="upgradeCondition" data-current="turn"></span><span class="upgradePrice" data-price="turn"></span></button>
+    <button data-upgrade="ammo"><b>Extra ammunition</b><small>Add a bullet slot, up to six.</small><span class="upgradeCondition" data-current="ammo"></span><span class="upgradePrice" data-price="ammo"></span></button>
+    <button data-upgrade="damage"><b>Stronger shots</b><small>+1 damage per shot, up to three.</small><span class="upgradeCondition" data-current="damage"></span><span class="upgradePrice" data-price="damage"></span></button>
+    <button data-upgrade="velocity"><b>Faster rounds</b><small>Faster travel and less target leading.</small><span class="upgradeCondition" data-current="velocity"></span><span class="upgradePrice" data-price="velocity"></span></button>
+    <button data-upgrade="blast"><b>Explosive shells</b><small>Hits deal 1 splash damage within 4m.</small><span class="upgradeCondition" data-current="blast"></span><span class="upgradePrice" data-price="blast"></span></button>
+    <button data-upgrade="jammer"><b>Radar jammer</b><small>Slow drones for 4s. Recharge: 18s.</small><span class="upgradeCondition" data-current="jammer"></span><span class="upgradePrice" data-price="jammer"></span></button></div>
   <p id="loadout"></p></div>
   <p id="resupplyStatus" role="status"></p><button id="nextBtn" class="primary" disabled>Start next wave</button></dialog>
 <dialog id="defeat"><span class="eyebrow">THE CASTLE HAS FALLEN</span><h2>Night closes in.</h2><p id="result"></p><button id="restartBtn" class="primary">Defend again</button><a class="backLink" href="../">Original 2D game</a></dialog>

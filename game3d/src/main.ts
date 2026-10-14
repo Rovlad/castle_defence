@@ -122,9 +122,21 @@ function updateHud(){
         el<HTMLButtonElement>('nextBtn').disabled=game.paused||wait>0;
         el('resupplyStatus').textContent=wait>0?`Resupply: ${wait}s · Buy upgrades or save your points`:'Ready when you are. Purchases are optional.';
         el('shopBalance').textContent=`Available: ${game.points} points`;
+        const conditions:Record<Upgrade,string>={
+            beam:`Current: ${Math.round(game.beam*180/Math.PI)}° beam · Max 90°`,
+            brightness:`Current: ${(1+game.brightnessLevel*.5).toFixed(1)}× brightness · Level ${game.brightnessLevel} / 3`,
+            turn:`Current: ${Math.round(game.turnSpeed*180/Math.PI)}°/s turn speed · Max ${Math.round(2.9*180/Math.PI)}°/s`,
+            ammo:`Current: ${game.capacity} bullet slots · Max 6`,
+            damage:`Current: ${game.damage} damage per hit · Max 3`,
+            velocity:`Current: ${game.projectileSpeed}m/s rounds · Max 100m/s`,
+            blast:game.blastRadius?`Current: Equipped · 1 splash damage within ${game.blastRadius}m`:'Current: Not equipped · Direct hits only',
+            jammer:game.jammerOwned?'Current: Equipped · 4s slow, 18s recharge':'Current: Not equipped'
+        };
         document.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button=>{
             const kind=button.dataset.upgrade as Upgrade,cost=UPGRADE_COSTS[kind],maxed=!game.canUpgrade(kind);
             button.disabled=game.paused||maxed||game.points<cost;
+            const current=button.querySelector('[data-current]')!;
+            if(current.textContent!==conditions[kind])current.textContent=conditions[kind];
             button.querySelector('[data-price]')!.textContent=maxed?'MAXED':`${cost} points${game.points<cost?' · Not enough points':''}`;
         });
     }
