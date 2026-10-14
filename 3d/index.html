@@ -5,9 +5,9 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2309131f'/%3E%3Cpath d='M7 25V10h4v4h3V7h4v7h3v-4h4v15z' fill='%23eac888'/%3E%3C/svg%3E">
   <script type="module" crossorigin src="./assets/_virtual/modulepreload-polyfill-B5Qt9EMX.js"></script>
   <script type="module" crossorigin src="./assets/src/upgradeLevels-GtnXM3x0.js"></script>
-  <script type="module" crossorigin src="./assets/src/model-Djl2MrrL.js"></script>
-  <script type="module" crossorigin src="./assets/src/intro-DaiB0TK9.js"></script>
-  <script type="module" crossorigin src="./assets/src/droneAudio-BUQ96BJl.js"></script>
+  <script type="module" crossorigin src="./assets/src/model-BLKmAj7O.js"></script>
+  <script type="module" crossorigin src="./assets/src/intro-BEsGlYCB.js"></script>
+  <script type="module" crossorigin src="./assets/src/droneAudio-RgSiDgad.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/textureSampler-cXfk8RXk.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/observable.pure-DBGveyWL.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/internalTexture-Bg1hGDap.js"></script>
@@ -251,14 +251,14 @@
   <script type="module" crossorigin src="./assets/src/searchlight-DwDqk52-.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.dynamicTexture.pure-3K3gaqCc.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/dynamicTexture.pure-Bjcpw6u0.js"></script>
-  <script type="module" crossorigin src="./assets/src/arena-4eaDnXKw.js"></script>
+  <script type="module" crossorigin src="./assets/src/arena-mLbisB3k.js"></script>
   <script type="module" crossorigin src="./assets/src/audio-B21xeNxT.js"></script>
-  <script type="module" crossorigin src="./assets/src/radar-HnppgFxX.js"></script>
+  <script type="module" crossorigin src="./assets/src/radar-Czvl0Nev.js"></script>
   <script type="module" crossorigin src="./assets/src/controls-aItrG2Ij.js"></script>
-  <script type="module" crossorigin src="./assets/src/feedback-BN2qwkWt.js"></script>
+  <script type="module" crossorigin src="./assets/src/feedback-BlZZjFXX.js"></script>
   <script type="module" crossorigin src="./assets/src/preferences-D5VhezoM.js"></script>
-  <script type="module" crossorigin src="./assets/src/main-C-yETnXd.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/src/style-BwQ-3wTJ.css">
+  <script type="module" crossorigin src="./assets/src/main-DdkEDx9l.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/src/style-DYbuCZjF.css">
 </head><body>
 <canvas id="world" aria-label="3D castle battlefield"></canvas>
 <div id="hud">
@@ -275,6 +275,7 @@
     <button id="jamBtn" hidden aria-label="Activate radar jammer">JAM · READY</button>
   </aside>
   <div id="hitFlash" aria-hidden="true"></div><div id="damageFlash" aria-hidden="true"></div>
+  <div id="encounterStatus" role="status" hidden></div>
   <div id="toast" role="status"></div>
   <div id="threatIndicator" hidden><span id="threatArrow" aria-hidden="true">↑</span><span id="threatText" role="status"></span></div>
   <div class="bottomline"><div><span class="eyebrow">WAVE PROGRESS</span><strong id="progressText">0 / 5</strong><progress id="progress" max="5" value="0"></progress></div>
@@ -293,8 +294,9 @@
       <li><strong>Sweep and shoot.</strong> The searchlight reveals drones but does no damage. Aim at their bodies. The radar shows targets even outside the beam.</li>
       <li><strong>Watch your bullet slots.</strong> Start with three shots in flight at once. A slot frees up when a shot hits or expires.</li>
       <li><strong>Finish each wave.</strong> All drones must be destroyed or reach the castle. Later waves bring more, faster and tougher enemies.</li>
-      <li><strong>Earn and spend points.</strong> Scouts give 10, armored drones 20 and heavies 30 points. Clearing a wave adds 20 and repairs one health, up to three.</li>
+      <li><strong>Earn and spend points.</strong> Scouts give 10, armored drones 20 and heavies 30 points. Clearing a wave adds 20 and repairs one health, up to three. Zero breaches earns a further 50-point flawless bonus.</li>
       <li><strong>Resupply.</strong> Buy upgrades with your points, or save them. After four seconds, press Start next wave. Purchases are optional.</li>
+      <li><strong>Special waves.</strong> Swarms, two-front attacks and brief light blackouts vary the challenge. Every fifth wave brings a carrier: hit its glowing front core for double damage and watch for deployed scouts.</li>
       <li><strong>Take a break.</strong> Use the pause button to freeze play. Choose your difficulty below; points and upgrades reset for a new run.</li>
     </ul>
   </details>
@@ -319,7 +321,7 @@
   <div class="settingRow"><label for="quality">Graphics</label><select id="quality"><option value="auto">Automatic</option><option value="low">Low</option><option value="high">High</option></select></div>
   <button id="closeSettingsBtn" class="primary">Done</button></dialog>
 <dialog id="resupply"><span class="eyebrow">RESUPPLY</span><h2 id="waveTitle">Wave cleared</h2><p id="repairText"></p><div class="shopToolbar"><p id="shopBalance" role="status"></p><button id="shopPauseBtn" class="textButton">Pause game</button></div>
-  <div class="shopItems"><div class="upgradeChoices"><button data-upgrade="beam"><b>Wider searchlight</b><small>Reveal more of the darkness.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="beam" role="img"></span><span class="levelCaption" data-level="beam"></span></span><span class="upgradeCondition" data-current="beam"></span><span class="upgradePrice" data-price="beam"></span></button>
+  <div class="shopItems"><section class="waveSummary" aria-label="Wave results"><p id="waveResults"></p><p id="flawlessBonus"></p><p id="nextEncounter"></p></section><div class="upgradeChoices"><button data-upgrade="beam"><b>Wider searchlight</b><small>Reveal more of the darkness.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="beam" role="img"></span><span class="levelCaption" data-level="beam"></span></span><span class="upgradeCondition" data-current="beam"></span><span class="upgradePrice" data-price="beam"></span></button>
     <button data-upgrade="brightness"><b>Brighter searchlight</b><small>+50% starting brightness per level, up to 2.5×.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="brightness" role="img"></span><span class="levelCaption" data-level="brightness"></span></span><span class="upgradeCondition" data-current="brightness"></span><span class="upgradePrice" data-price="brightness"></span></button>
     <button data-upgrade="turn"><b>Faster turret</b><small>Turn and track enemies faster.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="turn" role="img"></span><span class="levelCaption" data-level="turn"></span></span><span class="upgradeCondition" data-current="turn"></span><span class="upgradePrice" data-price="turn"></span></button>
     <button data-upgrade="ammo"><b>Extra ammunition</b><small>Add a bullet slot, up to six.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="ammo" role="img"></span><span class="levelCaption" data-level="ammo"></span></span><span class="upgradeCondition" data-current="ammo"></span><span class="upgradePrice" data-price="ammo"></span></button>

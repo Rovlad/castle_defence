@@ -39,3 +39,9 @@
 .levelBattery i{display:block;flex:1;min-width:0;border-radius:1px;background:#263e4c}.levelBattery i.charged{background:linear-gradient(#f8df9f,#cd9a48);box-shadow:0 0 5px #edc37a33}
 .levelBattery.full{border-color:#75bfa8}.levelBattery.full::after{background:#75bfa8}.levelBattery.full i.charged{background:linear-gradient(#a0e4bd,#4ba789)}
 .levelCaption{font-size:10px;letter-spacing:.8px;font-weight:700;color:#d8c8a3}.upgradeCondition{margin-top:5px}
+
+#encounterStatus{position:absolute;top:90px;left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);padding:7px 12px;background:#102634e8;border:1px solid #8f8061;border-radius:6px;color:#f1dca8;font-size:12px;text-align:center}
+#flawlessBonus{color:#a0e4bd;font-weight:700}#nextEncounter{border-left:3px solid #c8a86b;padding-left:10px}#waveResults{font-variant-numeric:tabular-nums}
+@media(max-width:600px){#encounterStatus{top:80px;font-size:10px;max-width:55%;left:12px;transform:none}}
+
+.waveSummary{padding:0 4px 12px;border-bottom:1px solid #506674;margin-bottom:12px}

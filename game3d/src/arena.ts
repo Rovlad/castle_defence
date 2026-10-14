@@ -48,7 +48,7 @@ export class Arena {
         this.scene.activeCamera = this.camera;
         this.stone = this.material('castle stone','#607681');this.metal = this.material('gun metal','#2b3e47');
         this.amber = this.material('lantern glass','#ecbb66',true);
-        this.enemyMaterials = {scout:this.material('scout drone','#a47862'),armored:this.material('armored drone','#8f9db3'),heavy:this.material('heavy drone','#738e75')};
+        this.enemyMaterials = {scout:this.material('scout drone','#a47862'),armored:this.material('armored drone','#8f9db3'),heavy:this.material('heavy drone','#738e75'),boss:this.material('carrier armor','#9e7966')};
         this.engineGlow = this.material('engine glow','#86d8e3',true);
         this.smokeMaterial=this.material('engine smoke','#52616a');this.smokeMaterial.alpha=.45;
         this.soot=this.material('scorched armor','#1b252c');
@@ -189,7 +189,7 @@ export class Arena {
     }
     private createEnemy(enemy:Enemy) {
         const root=new TransformNode(`enemy ${enemy.id}`,this.scene),mat=this.enemyMaterials[enemy.kind].clone(`drone paint ${enemy.id}`)!;
-        const heavy=enemy.kind==='heavy',armored=enemy.kind==='armored',scale=heavy?1.35:armored?1.1:1;
+        const boss=enemy.kind==='boss',heavy=enemy.kind==='heavy'||boss,armored=enemy.kind==='armored',scale=boss?2.3:heavy?1.35:armored?1.1:1;
         const hull=MeshBuilder.CreateSphere('drone hull',{diameter:1,segments:8},this.scene);
         hull.parent=root;hull.scaling.set(.9*scale,.38*scale,1.25*scale);hull.material=mat;
         const rotors:Mesh[]=[];
@@ -227,6 +227,13 @@ export class Arena {
             for(const side of [-1,1])this.box('armor plate',.15,.24,.8,mat,new Vector3(side*.42,.02,0),root);
         }
         if(heavy)this.box('heavy fuselage',.85,.38,1.0,mat,new Vector3(0,-.13,0),root);
+        if(boss){
+            this.box('carrier armored deck',2.6,.3,3.6,this.steel,new Vector3(0,.32,0),root);
+            for(const side of [-1,1])this.box('carrier drone bay',.7,.55,2.4,this.metal,new Vector3(side*1.1,-.4,0),root);
+            const core=MeshBuilder.CreateSphere('carrier weak core',{diameter:.7,segments:12},this.scene);
+            core.parent=root;core.position.set(0,.7,-(enemy.radius-.2));core.material=this.red;core.isPickable=false;
+            this.box('weak core frame',1.2,.15,.25,this.amber,new Vector3(0,.05,-2.2),root);
+        }
         const cracks:Mesh[]=[];
         for(const side of [-1,1]){
             const crack=this.box('armor crack',.035,.035,.4,this.soot,new Vector3(side*.15,.22,0),root);

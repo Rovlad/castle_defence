@@ -3,7 +3,7 @@ import { PlayableIntro } from './intro';
 import { droneSoundSources } from './droneAudio';
 import './style.css';
 import { Arena } from './arena';
-import { Siege, DIFFICULTIES, UPGRADE_COSTS, type Difficulty, type Upgrade } from './model';
+import { Siege, DIFFICULTIES, UPGRADE_COSTS, ENCOUNTERS, waveEncounter, type Difficulty, type Upgrade } from './model';
 import { GameAudio } from './audio';
 import { Radar } from './radar';
 import { AimSmoother } from './controls';
@@ -42,7 +42,7 @@ function beginRun(){
 }
 function startSession(){
     clearInput();game.start();hitUntil=damageUntil=0;lastWarning=-9;lastStep=0;el('targetFeedback').textContent='';el('screen').classList.add('hidden');lastTime=performance.now();void audio.unlock();
-    canvas.focus();updateHud();
+    canvas.focus();updateHud();if(!intro)toast(game.briefing.title);
 }
 function practice(){
     if(!arena)return;
@@ -93,6 +93,10 @@ function saveBest(){
     showBest();
 }
 function updateHud(){
+    const encounter=el('encounterStatus');encounter.hidden=!!intro||game.phase!=='combat';
+    const boss=game.enemies.find(enemy=>enemy.kind==='boss');
+    const encounterText=game.blackoutActive?`BLACKOUT · ${Math.ceil(12-game.waveElapsed)}s · Radar and weapons active`:`${game.briefing.title}${boss?` · Carrier ${boss.hp} / ${boss.maxHp} HP`:''}`;
+    if(encounter.textContent!==encounterText)encounter.textContent=encounterText;
     el('points').textContent=intro?'—':String(game.points);
     el<HTMLButtonElement>('pauseBtn').disabled=game.phase!=='combat'&&game.phase!=='resupply';
     el('wave').textContent=intro?'Practice':String(game.wave);el('health').textContent=`${game.health} / 3`;
@@ -160,12 +164,20 @@ function consumeEvents(){
         if(event.kind==='hit')audio.effect('hit');
         if(event.kind==='kill')audio.effect('explosion');
         if(event.kind==='blast')audio.effect('explosion');
+        if(event.kind==='launch')toast('Carrier deployed a scout · Check radar');
         if(event.kind==='pulse'){audio.effect('clear');toast('Jammer active · drones slowed for 4 seconds');}
         if(event.kind==='breach'){audio.effect('breach');damageUntil=performance.now()+550;toast(`${game.health} castle health remaining`);}
         if(event.kind==='clear'&&!intro){
             clearInput();audio.effect('clear');el('waveTitle').textContent=`Wave ${game.wave} cleared`;
             el('repairText').textContent=`One castle health restored, up to three. Spend earned points on upgrades, or save them for later.`;
             document.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button=>button.disabled=!game.canUpgrade(button.dataset.upgrade as Upgrade));
+            const result=game.lastResult;
+            if(result){
+                el('waveResults').textContent=`${result.kills} kills · ${result.breaches} breaches · ${result.shots?Math.round(result.hits/result.shots*100):0}% accuracy (${result.hits}/${result.shots}) · ${formatTime(result.time)} · ${result.points} points earned`;
+                el('flawlessBonus').textContent=result.flawless?'FLAWLESS DEFENCE · +50 bonus points':'No flawless bonus · Protect the castle without breaches to earn +50.';
+            }
+            const next=ENCOUNTERS[waveEncounter(game.wave+1)];
+            el('nextEncounter').textContent=`Next wave: ${next.title}. ${next.description}`;
             resupply.showModal();
         }
         if(event.kind==='lost'&&!intro){
@@ -188,7 +200,7 @@ el('introContinueBtn').addEventListener('click',()=>{
 function jam(){if(blocked())return;void audio.unlock();if(game.pulse()){consumeEvents();updateHud();}}
 el('jamBtn').addEventListener('click',jam);
 el('restartBtn').addEventListener('click',()=>{defeat.close();beginRun();});
-el('nextBtn').addEventListener('click',()=>{if(game.nextWave()){resupply.close();clearInput();lastTime=performance.now();lastStep=game.elapsed;canvas.focus();void audio.unlock();toast(`Wave ${game.wave}`);updateHud();}});
+el('nextBtn').addEventListener('click',()=>{if(game.nextWave()){resupply.close();clearInput();lastTime=performance.now();lastStep=game.elapsed;canvas.focus();void audio.unlock();toast(`Wave ${game.wave} · ${game.briefing.title}`);updateHud();}});
 document.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button=>button.addEventListener('click',()=>{
     if(game.upgrade(button.dataset.upgrade as Upgrade)){
         audio.effect('clear');
