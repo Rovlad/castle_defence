@@ -261,3 +261,17 @@ rotorAudio.muted=true;rotorAudio.effect('shot');assert(noiseStarts===2,'Muted gu
 console.log('PASS: muzzle noise, buffer reuse, low report, bolt clack and muted shots.');
 delete (globalThis as {document?:Document}).document;
 console.log('PASS: rotor layers, blade pulses, stereo, voice limit, cleanup, mute and hidden-page silence.');
+
+const { PlayableIntro } = await import('./src/intro.ts');
+const training=new PlayableIntro();
+assert(training.stage==='aim'&&training.game.phase==='combat','Training starts with a live aiming encounter');
+advance(training.game,60);training.update();
+assert(training.game.health===3&&training.game.enemies.length===1&&training.game.spawned===0,'Training neither spawns normal waves nor threatens the base');
+const aimAtPractice=()=>{const enemy=training.game.enemies[0];training.game.yaw=Math.atan2(enemy.x,enemy.z);training.game.pitch=Math.atan2(STATION.y-enemy.y,24);};
+aimAtPractice();training.game.tick(.01);training.update();assert(training.stage==='shoot','Revealing the drone advances aiming');
+assert(training.game.fire(),'Practice uses real gun controls');advance(training.game,.5);training.update();
+assert(training.stage==='radar'&&training.game.enemies.length===1&&training.game.enemies[0].reveal===0,'First kill introduces a radar target outside the beam');
+aimAtPractice();training.game.tick(.01);assert(training.game.fire(),'Second practice target can be shot');advance(training.game,.5);training.update();
+assert(training.stage==='complete'&&training.game.phase==='combat','Training finishes without opening the shop or defeat');
+const freshRun=new Siege();freshRun.start();assert(freshRun.kills===0&&freshRun.points===0&&freshRun.wave===1,'A fresh run has no practice rewards');
+console.log('PASS: playable introduction, safe practice, reveal/kill progression and isolated run state.');
