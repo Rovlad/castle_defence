@@ -126,7 +126,8 @@ function updateHud(){
         const wait=Math.max(0,Math.ceil(4-game.resupplyElapsed));
         el<HTMLButtonElement>('nextBtn').disabled=game.paused||wait>0;
         el('resupplyStatus').textContent=wait>0?`Resupply: ${wait}s · Buy upgrades or save your points`:'Ready when you are. Purchases are optional.';
-        el('shopBalance').textContent=`Available: ${game.points} points`;
+        const balance=el('shopBalance'),balanceText=`${game.points} points`;
+        if(balance.textContent!==balanceText)balance.textContent=balanceText;
         const conditions:Record<Upgrade,string>={
             beam:`${Math.round(game.beam*180/Math.PI)}° beam`,
             brightness:`${(1+game.brightnessLevel*.5).toFixed(1)}× brightness`,
@@ -168,16 +169,27 @@ function consumeEvents(){
         if(event.kind==='pulse'){audio.effect('clear');toast('Jammer active · drones slowed for 4 seconds');}
         if(event.kind==='breach'){audio.effect('breach');damageUntil=performance.now()+550;toast(`${game.health} castle health remaining`);}
         if(event.kind==='clear'&&!intro){
-            clearInput();audio.effect('clear');el('waveTitle').textContent=`Wave ${game.wave} cleared`;
-            el('repairText').textContent=`One castle health restored, up to three. Spend earned points on upgrades, or save them for later.`;
+            clearInput();audio.effect('clear');el('waveTitle').textContent=`Wave ${game.wave} secured`;
+            el('repairText').textContent=`Castle condition · ${game.health} / 3 health`;
             document.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach(button=>button.disabled=!game.canUpgrade(button.dataset.upgrade as Upgrade));
             const result=game.lastResult;
             if(result){
-                el('waveResults').textContent=`${result.kills} kills · ${result.breaches} breaches · ${result.shots?Math.round(result.hits/result.shots*100):0}% accuracy (${result.hits}/${result.shots}) · ${formatTime(result.time)} · ${result.points} points earned`;
-                el('flawlessBonus').textContent=result.flawless?'FLAWLESS DEFENCE · +50 bonus points':'No flawless bonus · Protect the castle without breaches to earn +50.';
+                el('resultKills').textContent=String(result.kills);
+                el('resultBreaches').textContent=String(result.breaches);
+                el('resultAccuracy').textContent=`${result.shots?Math.round(result.hits/result.shots*100):0}%`;
+                el('resultHits').textContent=`${result.hits} / ${result.shots} shots hit`;
+                el('resultTime').textContent=formatTime(result.time);
+                el('resultPoints').textContent=`+${result.points}`;
+                el('defenceRating').textContent=result.flawless?'FLAWLESS DEFENCE':'WAVE SURVIVED';
+                el('defenceDetail').textContent=result.flawless?'Every approach stopped. Perimeter intact.':'Regroup and rearm. Hold the next perimeter.';
+                el('flawlessBonus').textContent=result.flawless?'+50 BONUS':'NO BONUS';
+                el('flawlessBonus').setAttribute('aria-label',result.flawless?'Flawless defence bonus: 50 points':'No flawless bonus. Zero breaches earns 50 points.');
+                el('resupply').classList.toggle('flawless',result.flawless);
             }
             const next=ENCOUNTERS[waveEncounter(game.wave+1)];
-            el('nextEncounter').textContent=`Next wave: ${next.title}. ${next.description}`;
+            el('nextWaveLabel').textContent=`NEXT MISSION · WAVE ${game.wave+1}`;
+            el('nextEncounterTitle').textContent=next.title;
+            el('nextEncounter').textContent=next.description;
             resupply.showModal();
         }
         if(event.kind==='lost'&&!intro){
