@@ -258,8 +258,8 @@
   <script type="module" crossorigin src="./assets/src/controls-Dx1QTRmh.js"></script>
   <script type="module" crossorigin src="./assets/src/feedback-BlZZjFXX.js"></script>
   <script type="module" crossorigin src="./assets/src/preferences-D5VhezoM.js"></script>
-  <script type="module" crossorigin src="./assets/src/main-IlsQ5Oc2.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/src/style-BlT4cFzl.css">
+  <script type="module" crossorigin src="./assets/src/main-B_noQDAC.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/src/style-Dez0wiHo.css">
 </head><body>
 <canvas id="world" aria-label="3D castle battlefield"></canvas>
 <div id="hud">
@@ -326,8 +326,7 @@
   <div class="settingRow"><label for="aimAssist">Gentle aim assistance</label><input id="aimAssist" type="checkbox"></div>
   <div class="settingRow"><label for="quality">Graphics</label><select id="quality"><option value="auto">Automatic</option><option value="low">Low</option><option value="high">High</option></select></div>
   <button id="closeSettingsBtn" class="primary">Done</button></dialog>
-<dialog id="resupply"><span class="eyebrow">MISSION DEBRIEF · REARM &amp; REDEPLOY</span><h2 id="waveTitle">Wave cleared</h2><p id="repairText"></p><div class="shopToolbar"><div class="creditWallet"><span class="creditCoin" aria-hidden="true">✦</span><div><span class="eyebrow">UPGRADE CREDITS</span><strong id="shopBalance" role="status"></strong></div></div><button id="shopPauseBtn" class="textButton">Pause game</button></div>
-  <div class="shopItems"><section class="waveSummary" aria-label="Mission debrief">
+<dialog id="resupply"><span class="eyebrow">MISSION DEBRIEF · REARM &amp; REDEPLOY</span><h2 id="waveTitle">Wave cleared</h2>  <div class="shopItems" role="region" aria-label="Wave results and equipment upgrades" aria-describedby="shopScrollHint" tabindex="0"><div class="shopContent"><div class="shopOverview"><p id="repairText"></p><div class="shopToolbar"><div class="creditWallet"><span class="creditCoin" aria-hidden="true">✦</span><div><span class="eyebrow">UPGRADE CREDITS</span><strong id="shopBalance" role="status"></strong></div></div><button id="shopPauseBtn" class="textButton">Pause game</button></div></div><section class="waveSummary" aria-label="Mission debrief">
     <div class="debriefHero">
       <svg class="debriefShield" viewBox="0 0 64 72" aria-hidden="true"><path d="M32 3 59 14v22c0 16-13 26-27 33C18 62 5 52 5 36V14Z"/><path class="shieldMark" d="m19 34 9 9 18-21"/></svg>
       <div><span class="eyebrow">DEFENCE REPORT</span><h3 id="defenceRating"></h3><p id="defenceDetail"></p></div>
@@ -349,6 +348,7 @@
     <button data-upgrade="velocity"><b>Faster rounds</b><small>Faster travel and less target leading.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="velocity" role="img"></span><span class="levelCaption" data-level="velocity"></span></span><span class="upgradeCondition" data-current="velocity"></span><span class="upgradePrice" data-price="velocity"></span></button>
     <button data-upgrade="blast"><b>Explosive shells</b><small>Hits deal 1 splash damage within 4m.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="blast" role="img"></span><span class="levelCaption" data-level="blast"></span></span><span class="upgradeCondition" data-current="blast"></span><span class="upgradePrice" data-price="blast"></span></button>
     <button data-upgrade="jammer"><b>Radar jammer</b><small>Slow drones for 4s. Recharge: 18s.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="jammer" role="img"></span><span class="levelCaption" data-level="jammer"></span></span><span class="upgradeCondition" data-current="jammer"></span><span class="upgradePrice" data-price="jammer"></span></button></div>
-  <p id="loadout"></p></div>
+  <p id="loadout"></p></div></div>
+  <div id="shopScrollHint">Scroll to browse upgrades ↓</div>
   <p id="resupplyStatus" role="status"></p><button id="nextBtn" class="primary" disabled>Start next wave</button></dialog>
 <dialog id="defeat"><span class="eyebrow">THE CASTLE HAS FALLEN</span><h2>Night closes in.</h2><p id="result"></p><button id="restartBtn" class="primary">Defend again</button><a class="backLink" href="../">Original 2D game</a></dialog></body></html>
