@@ -6,8 +6,9 @@
   <script type="module" crossorigin src="./assets/_virtual/modulepreload-polyfill-B5Qt9EMX.js"></script>
   <script type="module" crossorigin src="./assets/src/upgradeLevels-GtnXM3x0.js"></script>
   <script type="module" crossorigin src="./assets/src/model-BLKmAj7O.js"></script>
-  <script type="module" crossorigin src="./assets/src/intro-BEsGlYCB.js"></script>
+  <script type="module" crossorigin src="./assets/src/intro-Bn_slo2T.js"></script>
   <script type="module" crossorigin src="./assets/src/droneAudio-RgSiDgad.js"></script>
+  <script type="module" crossorigin src="./assets/src/display-DI9Maj6T.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/textureSampler-cXfk8RXk.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Misc/observable.pure-DBGveyWL.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/internalTexture-Bg1hGDap.js"></script>
@@ -251,14 +252,14 @@
   <script type="module" crossorigin src="./assets/src/searchlight-DwDqk52-.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Engines/Extensions/engine.dynamicTexture.pure-3K3gaqCc.js"></script>
   <script type="module" crossorigin src="./assets/node_modules/@babylonjs/core/Materials/Textures/dynamicTexture.pure-Bjcpw6u0.js"></script>
-  <script type="module" crossorigin src="./assets/src/arena-mLbisB3k.js"></script>
+  <script type="module" crossorigin src="./assets/src/arena-ClcoT6DV.js"></script>
   <script type="module" crossorigin src="./assets/src/audio-B21xeNxT.js"></script>
   <script type="module" crossorigin src="./assets/src/radar-Czvl0Nev.js"></script>
-  <script type="module" crossorigin src="./assets/src/controls-aItrG2Ij.js"></script>
+  <script type="module" crossorigin src="./assets/src/controls-DHUfqWmu.js"></script>
   <script type="module" crossorigin src="./assets/src/feedback-BlZZjFXX.js"></script>
   <script type="module" crossorigin src="./assets/src/preferences-D5VhezoM.js"></script>
-  <script type="module" crossorigin src="./assets/src/main-CE51ec6j.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/src/style-DM68Q4cH.css">
+  <script type="module" crossorigin src="./assets/src/main-C1J9DAma.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/src/style-D-bYzA40.css">
 </head><body>
 <canvas id="world" aria-label="3D castle battlefield"></canvas>
 <div id="hud">
@@ -282,8 +283,12 @@
     <div><span class="eyebrow">WAVE TIME</span><strong id="time">0:00</strong><small id="arrival">Next in 2.5s</small></div><div><span class="eyebrow">REMAINING</span><strong id="remaining">5</strong></div>
     <div class="bearing"><span class="eyebrow">BEARING</span><strong id="bearing">N · 000°</strong></div></div>
 </div>
-<div id="mobileControls"><div class="turnButtons"><button id="leftBtn" aria-label="Rotate left">◀</button><button id="rightBtn" aria-label="Rotate right">▶</button></div>
-  <span>Drag to aim</span><button id="fireBtn">FIRE</button></div>
+<div id="mobileControls">
+  <div id="turretWheel" role="slider" tabindex="0" aria-label="Turret rotation wheel. Rotate with your finger or use Left and Right arrow keys." aria-valuemin="0" aria-valuemax="359" aria-valuenow="0">
+    <div class="wheelRotor" aria-hidden="true"><i></i><i></i><i></i><b></b></div><span aria-hidden="true">TURN</span>
+  </div>
+  <span>Rotate wheel to turn<br>Drag battlefield to aim</span><button id="fireBtn">FIRE</button>
+</div>
 <section id="screen" class="overlay"><div class="card">
   <span class="eyebrow">FIXED-POSITION DEFENCE</span><h1>Night Siege<span>3D</span></h1>
   <p class="intro">One gun. One light.<br>Hold the castle against the darkness.</p>
@@ -301,7 +306,7 @@
     </ul>
   </details>
   <p class="desktopHelp">Mouse drag or arrow keys to aim. Click or Space to fire. P activates the radar jammer once equipped. Escape pauses.</p>
-  <p class="touchHelp">Drag the battlefield to aim. Tap FIRE to shoot. Hold the arrow buttons to turn.</p>
+  <p class="touchHelp">Drag the battlefield to aim. Tap FIRE to shoot. Rotate the wheel to turn the turret.</p>
   <div class="settingRow"><label for="difficulty">Difficulty</label><select id="difficulty"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option><option value="suicide">Suicide</option></select></div><p id="difficultyHelp">Standard waves and enemy speed.</p>
   <button id="startBtn" class="primary" disabled>Loading battlefield…</button><button id="skipOpeningBtn" class="textButton" disabled>Skip intro · Start game</button><button id="practiceBtn" class="textButton" disabled>Practice controls</button><button id="startSettingsBtn" class="textButton">Settings</button>
   <a class="backLink" href="../">Play the original 2D game</a><div id="best"></div>
