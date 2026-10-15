@@ -333,3 +333,14 @@ roller.reset();assert(roller.move(200)===0,'New gesture reanchors after release 
 assert(roller.move(300)===1.2,'Long swipe stays proportional without angular seams or hub crossings');
 console.log('PASS: mobile render density and horizontal roller direction, proportional movement and reset.');
 }
+
+{
+const {DoubleTap}=await import('./src/controls.ts');const taps=new DoubleTap();
+assert(!taps.tap(100,100,1000)&&taps.tap(105,102,1200),'Nearby quick taps fire once');
+assert(!taps.tap(100,100,1300),'Third tap starts a new pair');
+assert(!taps.tap(100,100,1700),'Slow taps do not fire');
+assert(!taps.tap(200,100,1800),'Distant taps do not fire');
+taps.reset();assert(!taps.tap(200,100,1900),'Reset clears pending tap');
+assert(taps.tap(200,100,2100)&&!taps.tap(200,100,2200),'Successful pairs are consumed');
+console.log('PASS: double-tap timing, spatial tolerance, pair consumption and reset.');
+}
