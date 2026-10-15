@@ -334,7 +334,7 @@ window.addEventListener('keydown',event=>{
 window.addEventListener('keyup',event=>{if(keyMap[event.code])held[keyMap[event.code]]=false;if(event.code==='Space'){held.fire=false;if(event.target===el('fireBtn'))event.preventDefault();}});
 window.addEventListener('blur',clearInput);
 document.addEventListener('visibilitychange',()=>{clearInput();lastTime=performance.now();if(document.hidden)audio.suspend();else if(!game.paused)void audio.unlock();});
-window.addEventListener('resize',()=>{arena?.engine.resize();radar.resize();});
+window.addEventListener('resize',()=>{clearInput();arena?.engine.resize();radar.resize();});
 soundStatus();showBest();updateHud();
 try{
     arena=new Arena(canvas);
