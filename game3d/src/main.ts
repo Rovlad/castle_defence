@@ -6,7 +6,7 @@ import { Arena } from './arena';
 import { Siege, DIFFICULTIES, UPGRADE_COSTS, ENCOUNTERS, waveEncounter, type Difficulty, type Upgrade } from './model';
 import { GameAudio } from './audio';
 import { Radar } from './radar';
-import { AimSmoother, RotationWheel } from './controls';
+import { AimSmoother, TurretRoller } from './controls';
 import { targetFeedback } from './feedback';
 import { loadDifficultyPreferences, type BestScore } from './preferences';
 
@@ -15,7 +15,7 @@ const canvas = el<HTMLCanvasElement>('world');
 const radarCanvas = el<HTMLCanvasElement>('radarCanvas');
 const radar = new Radar(radarCanvas);
 const touchAim = new AimSmoother();
-const rotationWheel=new RotationWheel();
+const turretRoller=new TurretRoller();
 let wheelPointer:number|null=null;
 let aimAssist = matchMedia('(pointer:coarse)').matches;
 const pauseDialog = el<HTMLDialogElement>('pauseDialog');
@@ -64,7 +64,7 @@ el<HTMLInputElement>('sensitivity').value=String(sensitivity);
 el<HTMLInputElement>('aimAssist').checked=aimAssist;
 function formatTime(seconds:number){const n=Math.floor(seconds);return `${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;}
 function toast(message:string){el('toast').textContent=message;toastUntil=performance.now()+2200;}
-function clearInput(){Object.keys(held).forEach(key=>held[key as keyof typeof held]=false);drag=null;touchAim.clear();rotationWheel.reset();wheelPointer=null;}
+function clearInput(){Object.keys(held).forEach(key=>held[key as keyof typeof held]=false);drag=null;touchAim.clear();turretRoller.reset();wheelPointer=null;}
 function blocked(){return document.hidden||settings.open||game.paused||game.phase!=='combat';}
 function soundStatus(){
     el('soundBtn').textContent=audio.muted?'Sound off':'Sound on';
@@ -115,7 +115,7 @@ function updateHud(){
         game.nextArrival===null?'All spawned':`Next in ${game.nextArrival.toFixed(1)}s`;
     const degrees=(Math.round(game.yaw*180/Math.PI)+360)%360,points=['N','NE','E','SE','S','SW','W','NW'];
     const wheel=el('turretWheel');
-    wheel.style.setProperty('--wheel-angle',`${game.yaw*180/Math.PI}deg`);
+    wheel.style.setProperty('--roller-offset',`${game.yaw/.012}px`);
     const bearingText=`${degrees} degrees`;
     if(wheel.getAttribute('aria-valuenow')!==String(degrees)){
         wheel.setAttribute('aria-valuenow',String(degrees));wheel.setAttribute('aria-valuetext',bearingText);
@@ -290,16 +290,15 @@ function bindHold(id:string,key:'left'|'right'|'fire'){
 bindHold('fireBtn','fire');
 const wheel=el('turretWheel');
 function wheelMove(event:PointerEvent){
-    const bounds=wheel.getBoundingClientRect();
-    const delta=rotationWheel.move(event.clientX-bounds.left-bounds.width/2,event.clientY-bounds.top-bounds.height/2);
+    const delta=turretRoller.move(event.clientX);
     touchAim.add(delta*sensitivity*(game.turnSpeed/1.4),0);
 }
 wheel.addEventListener('pointerdown',event=>{
     event.preventDefault();if(blocked()||wheelPointer!==null)return;
-    wheelPointer=event.pointerId;rotationWheel.reset();wheel.setPointerCapture(event.pointerId);wheelMove(event);void audio.unlock();
+    wheelPointer=event.pointerId;turretRoller.reset();wheel.setPointerCapture(event.pointerId);wheelMove(event);void audio.unlock();
 });
 wheel.addEventListener('pointermove',event=>{if(!blocked()&&wheelPointer===event.pointerId){event.preventDefault();wheelMove(event);}});
-const releaseWheel=(event:PointerEvent)=>{if(wheelPointer===event.pointerId){rotationWheel.reset();wheelPointer=null;}};
+const releaseWheel=(event:PointerEvent)=>{if(wheelPointer===event.pointerId){turretRoller.reset();wheelPointer=null;}};
 wheel.addEventListener('pointerup',releaseWheel);wheel.addEventListener('pointercancel',releaseWheel);wheel.addEventListener('lostpointercapture',releaseWheel);
 wheel.addEventListener('keydown',event=>{
     if(!['ArrowLeft','ArrowRight'].includes(event.code))return;
