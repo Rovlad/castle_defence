@@ -1,3 +1,4 @@
+import { hardwareScale } from './display';
 import { Engine } from '@babylonjs/core/Engines/engine';
 import { Scene } from '@babylonjs/core/scene';
 import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
@@ -322,7 +323,7 @@ export class Arena {
         this.lowQuality=low;this.details.setEnabled(!low);this.explosion.setEnabled(!low);
         this.bodies.forEach(body=>body.details.setEnabled(!low));
         while(this.sparks.length>(low?64:160))this.sparks.shift()!.mesh.dispose();
-        this.engine.setHardwareScalingLevel(Math.max(1,(window.devicePixelRatio||1)/(low?1:1.7)));
+        this.engine.setHardwareScalingLevel(hardwareScale(value,window.devicePixelRatio,mobile));
         this.shadow.getShadowMap()?.resize(low?512:1024);this.engine.resize();
     }
     reset() {

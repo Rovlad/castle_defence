@@ -319,3 +319,16 @@ assert(splashCarrier.hp===9&&splashBoss.waveHits===1,'Splash damages the carrier
 console.log('PASS: flawless/results accounting, encounter cycle, swarms, pincer, blackout pause/restore, carrier deployments and weak-point damage.');
 
 }
+
+{
+const {hardwareScale}=await import('./src/display.ts');
+assert(hardwareScale('auto',3,true)===1/1.5,'Mobile auto renders above CSS resolution instead of below it');
+assert(hardwareScale('low',3,true)===1&&hardwareScale('high',3,true)===.5,'Quality presets bound render resolution');
+assert(hardwareScale('high',1,true)===1,'Standard density screens keep native resolution');
+const {RotationWheel}=await import('./src/controls.ts');const wheel=new RotationWheel();
+assert(wheel.move(40,0)===0&&Math.abs(wheel.move(0,40)-Math.PI/2)<1e-9,'Clockwise quarter-turn rotates the turret right');
+wheel.reset();wheel.move(-40,1);assert(Math.abs(wheel.move(-40,-1))<.1,'Crossing the angular seam stays smooth');
+assert(wheel.move(0,0)===0&&wheel.move(40,0)===0,'Crossing the hub cannot jump direction');
+wheel.reset();wheel.move(0,40);assert(wheel.move(40,0)<0,'Counterclockwise movement turns left');
+console.log('PASS: mobile render density and wheel direction, seam wrapping, reset and hub dead zone.');
+}
