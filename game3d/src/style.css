@@ -66,3 +66,32 @@
 @media(pointer:coarse){.bottomline{bottom:105px}#mobileControls>span{text-align:center;line-height:1.6;font-size:10px}}
 @media(pointer:coarse) and (max-height:520px){#turretWheel{width:140px;height:64px}.bottomline{bottom:85px}}
 @media(pointer:coarse){#toast{bottom:245px}}@media(pointer:coarse) and (max-height:520px){#toast{bottom:190px}}
+
+/* Thumb-friendly landscape HUD: preserve the centre for aiming and respect display cutouts. */
+@media(pointer:coarse) and (orientation:landscape) and (max-height:600px){
+  .topline{padding:calc(5px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 8px calc(12px + env(safe-area-inset-left));gap:8px;align-items:center;background:linear-gradient(#07121fee,#07121f88,transparent)}
+  .topline .eyebrow{display:none}.topline strong{font:700 17px Arial,sans-serif}.resources{gap:14px;font-size:10px}.resources b{display:inline;font-size:15px;margin-left:4px}.resources small{display:none}.topline .icon{width:44px;height:44px;min-width:44px}
+  .bottomline{top:calc(60px + env(safe-area-inset-top));bottom:auto;left:calc(12px + env(safe-area-inset-left));right:auto;gap:14px;padding:6px 10px;border:1px solid #38536388;border-radius:7px;background:#081a27b8;align-items:center}
+  .bottomline>div:first-child{min-width:76px}.bottomline .eyebrow{font-size:8px;letter-spacing:.6px;margin-bottom:3px}.bottomline strong{font-size:14px}.bottomline small{font-size:9px;margin-top:2px;min-height:10px}.bottomline progress{width:76px;margin-top:4px;height:3px}.bottomline .bearing{display:none}
+  #radarPanel{top:calc(60px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));width:94px;padding:5px 3px}.radarHeading{font-size:8px;letter-spacing:.5px}.radarHeading small{font-size:8px}.radarLegend{display:none}
+  #jamBtn{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:116px;min-height:44px;margin:0;font-size:10px}
+  #mobileControls{left:calc(18px + env(safe-area-inset-left));right:calc(18px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));align-items:flex-end}#mobileControls>span{display:none}#turretWheel{width:156px;height:72px}#fireBtn{width:104px;height:72px;font-size:18px;flex-shrink:0;border-radius:12px}
+  #encounterStatus{top:calc(121px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));right:auto;max-width:250px;transform:none;padding:5px 8px;font-size:10px;text-align:left}
+  #threatIndicator{top:calc(153px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));width:190px;padding:5px 8px;font-size:11px;gap:7px}#threatArrow{font-size:20px}
+  #toast{top:auto;bottom:calc(100px + env(safe-area-inset-bottom));left:180px;right:130px;width:auto;padding:0 12px;font-size:11px}
+  #introGuide{top:calc(62px + env(safe-area-inset-top));bottom:auto;left:calc(12px + env(safe-area-inset-left));width:min(245px,calc(50vw - 24px - env(safe-area-inset-left)));max-height:calc(100dvh - 154px - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto;padding:10px 12px}#introGuide h2{font-size:16px}#introGuide p{font-size:12px;line-height:1.4}#introGuide .eyebrow{font-size:8px;letter-spacing:1px}#introGuide .primary{min-height:44px;padding:8px}
+  #screen.overlay{padding:calc(8px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));align-items:center}
+  #screen .card{max-width:860px;height:100%;max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:22px;padding:16px 20px;text-align:left;margin:0 auto}
+  .openingIdentity{align-self:center;min-width:0;min-height:0;max-height:100%;overflow:auto}.openingIdentity h1{font-size:38px}.openingIdentity h1 span{letter-spacing:5px}.openingIdentity .intro{display:block;font-size:18px;margin:14px 0}.openingIdentity .instructions{font-size:12px;line-height:1.5}
+  .openingSetup{min-height:0;overflow-y:auto;overscroll-behavior:contain;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start;padding:2px 5px 5px}
+  .openingSetup .settingRow{grid-column:1/-1;margin:0;font-size:13px}.openingSetup #difficultyHelp{grid-column:1/-1;font-size:11px;line-height:1.4;margin:0 0 4px}.openingSetup #startBtn{grid-column:1/-1;min-height:46px;font-size:14px}.openingSetup .textButton{font-size:11px;padding:6px;min-height:44px}.openingSetup .desktopHelp,.openingSetup .touchHelp{display:none}
+  .openingSetup .openingRules{grid-column:1/-1;order:5;margin:4px 0;padding:10px 0}.openingRules summary{font-size:12px}.openingSetup .backLink,.openingSetup #best{grid-column:1/-1;order:6;margin:0;padding:6px 0;font-size:11px}
+  #resupply[open]{width:min(940px,calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:10px 16px}
+  #resupply>.eyebrow{display:none}#resupply h2{font-size:21px;margin:0 0 3px}#resupply #repairText{font-size:10px;margin:2px 0}.shopToolbar{padding:3px 0 6px;margin-bottom:5px}.creditWallet strong{font-size:16px}.shopToolbar .textButton{min-height:44px;padding:6px 12px}#resupply #nextBtn{min-height:44px;margin-top:4px;padding:8px}#resupplyStatus{min-height:16px;font-size:11px}
+  dialog{max-height:calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:16px;width:min(520px,calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)))}dialog h2{font-size:25px}.settingRow{margin:12px 0}
+}
+@media(pointer:coarse) and (orientation:landscape) and (max-height:600px) and (min-width:700px){
+  #resupply .shopItems{display:grid;grid-template-columns:minmax(220px,.9fr) minmax(260px,1.1fr);column-gap:16px;align-items:start}
+  .waveSummary{grid-column:1;grid-row:1/span 3;margin:0}.armoryHeading{grid-column:2;grid-row:1}.upgradeChoices{grid-column:2;grid-row:2}#loadout{grid-column:2;grid-row:3}
+  .debriefHero{flex-wrap:wrap;padding:10px;gap:8px}.debriefHero h3{font-size:14px}.debriefShield{width:30px;height:36px}.debriefStats{grid-template-columns:repeat(2,minmax(0,1fr))}.debriefStat strong{font-size:22px}.debriefStat{padding:8px}.earnedReward{padding:10px}.earnedReward>span{font-size:9px}.earnedReward strong{font-size:23px}.nextMission{padding:10px;gap:8px}.nextMission h3{font-size:14px}
+}

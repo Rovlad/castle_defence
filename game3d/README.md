@@ -45,6 +45,12 @@ Upgrade prices per purchase: searchlight width 30, searchlight brightness 40, tu
 
 Use the pause button or Escape to freeze combat or resupply. Resume restores the same state; held inputs are cleared. The shop also has a pause button. Settings and hidden tabs still pause simulation. P continues to activate the jammer.
 
+## Mobile landscape layout
+
+Rotate a touch phone horizontally for a dedicated layout: the roller and FIRE sit at opposite lower corners, compact wave stats and alerts stay on the left, and a smaller radar stays on the right. If equipped, the jammer moves between the thumb controls. The layout keeps the centre clear for aiming and accounts for display safe-area insets. Rotation preserves the current run and heading; portrait controls remain available when rotating back.
+
+The opening screen uses side-by-side branding and setup, training guidance scrolls on short displays, and wider landscape resupply screens place the debrief beside the armory. Settings and results remain scrollable, with the next-wave button outside the scrolling shop area.
+
 ## Develop and verify
 
 Requires Node.js 22.18+ (or a newer LTS) and npm.
