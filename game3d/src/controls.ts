@@ -20,3 +20,15 @@ export class TurretRoller {
         return previous===null?0:(x-previous)*.012;
     }
 }
+
+export class DoubleTap {
+    private previous:{x:number;y:number;time:number}|null=null;
+    reset(){this.previous=null;}
+    tap(x:number,y:number,time:number){
+        const previous=this.previous;
+        if(previous&&time>previous.time&&time-previous.time<=320&&Math.hypot(x-previous.x,y-previous.y)<=32){
+            this.reset();return true;
+        }
+        this.previous={x,y,time};return false;
+    }
+}

@@ -6,7 +6,7 @@ import { Arena } from './arena';
 import { Siege, DIFFICULTIES, UPGRADE_COSTS, ENCOUNTERS, waveEncounter, type Difficulty, type Upgrade } from './model';
 import { GameAudio } from './audio';
 import { Radar } from './radar';
-import { AimSmoother, TurretRoller } from './controls';
+import { AimSmoother, TurretRoller, DoubleTap } from './controls';
 import { targetFeedback } from './feedback';
 import { loadDifficultyPreferences, type BestScore } from './preferences';
 
@@ -15,6 +15,7 @@ const canvas = el<HTMLCanvasElement>('world');
 const radarCanvas = el<HTMLCanvasElement>('radarCanvas');
 const radar = new Radar(radarCanvas);
 const touchAim = new AimSmoother();
+const doubleTap=new DoubleTap();
 const turretRoller=new TurretRoller();
 let wheelPointer:number|null=null;
 let aimAssist = matchMedia('(pointer:coarse)').matches;
@@ -53,7 +54,7 @@ function practice(){
 
 let lastTime = performance.now(), sensitivity = 1, toastUntil = 0, hitUntil = 0, damageUntil = 0, lastStep = 0, lastWarning = -9;
 const held = {left:false,right:false,up:false,down:false,fire:false};
-let drag: {id:number;x:number;y:number;distance:number} | null = null;
+let drag: {id:number;x:number;y:number;distance:number;started:number} | null = null;
 let best: BestScore | null = null;
 try {
     sensitivity = Math.max(.5,Math.min(2,Number(localStorage.getItem('night-siege-3d-sensitivity'))||1));
@@ -64,7 +65,7 @@ el<HTMLInputElement>('sensitivity').value=String(sensitivity);
 el<HTMLInputElement>('aimAssist').checked=aimAssist;
 function formatTime(seconds:number){const n=Math.floor(seconds);return `${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`;}
 function toast(message:string){el('toast').textContent=message;toastUntil=performance.now()+2200;}
-function clearInput(){Object.keys(held).forEach(key=>held[key as keyof typeof held]=false);drag=null;touchAim.clear();turretRoller.reset();wheelPointer=null;}
+function clearInput(){Object.keys(held).forEach(key=>held[key as keyof typeof held]=false);drag=null;touchAim.clear();doubleTap.reset();turretRoller.reset();wheelPointer=null;}
 function blocked(){return document.hidden||settings.open||game.paused||game.phase!=='combat';}
 function soundStatus(){
     el('soundBtn').textContent=audio.muted?'Sound off':'Sound on';
@@ -74,6 +75,7 @@ function soundStatus(){
 function showBest(){el('best').textContent=best?`Best ${DIFFICULTIES[difficultySelect.value as Difficulty].label} defence: wave ${best.wave} · ${best.kills} kills · ${formatTime(best.time)}`:'';}
 function shoot(){
     if(blocked())return;
+    doubleTap.reset();
     const pending=touchAim.flush();game.aim(pending.x,pending.y);
     if(aimAssist)game.assistAim(.025);
     const wasRunning=audio.context?.state==='running';
@@ -267,8 +269,10 @@ el<HTMLInputElement>('aimAssist').addEventListener('change',event=>{
 el<HTMLSelectElement>('quality').addEventListener('change',event=>arena?.setQuality((event.target as HTMLSelectElement).value));
 canvas.tabIndex=0;
 canvas.addEventListener('pointerdown',event=>{
-    if(blocked()||drag)return;void audio.unlock();canvas.setPointerCapture(event.pointerId);
-    drag={id:event.pointerId,x:event.clientX,y:event.clientY,distance:0};
+    if(blocked())return;
+    if(drag){drag.distance=Infinity;doubleTap.reset();return;}
+    void audio.unlock();canvas.setPointerCapture(event.pointerId);
+    drag={id:event.pointerId,x:event.clientX,y:event.clientY,distance:0,started:event.timeStamp};
 });
 canvas.addEventListener('pointermove',event=>{
     if(blocked()||!drag||drag.id!==event.pointerId)return;
@@ -278,8 +282,18 @@ canvas.addEventListener('pointermove',event=>{
     if(event.pointerType==='touch')touchAim.add(dx*factor,dy*factor);
     else game.aim(dx*factor,dy*factor);
 });
-canvas.addEventListener('pointerup',event=>{if(drag?.id===event.pointerId){const click=drag.distance<5&&event.pointerType==='mouse';drag=null;if(click)shoot();}});
-canvas.addEventListener('pointercancel',()=>drag=null);canvas.addEventListener('lostpointercapture',()=>drag=null);
+canvas.addEventListener('pointerup',event=>{
+    if(drag?.id!==event.pointerId)return;
+    const movement=drag.distance+Math.abs(event.clientX-drag.x)+Math.abs(event.clientY-drag.y);
+    const duration=event.timeStamp-drag.started;drag=null;
+    if(blocked()){doubleTap.reset();return;}
+    if(event.pointerType==='mouse'){doubleTap.reset();if(movement<5)shoot();return;}
+    if(event.pointerType==='touch'&&movement<12&&duration<=250){
+        if(doubleTap.tap(event.clientX,event.clientY,event.timeStamp))shoot();
+    }else doubleTap.reset();
+});
+const cancelAim=(event:PointerEvent)=>{if(drag?.id===event.pointerId){drag=null;doubleTap.reset();}};
+canvas.addEventListener('pointercancel',cancelAim);canvas.addEventListener('lostpointercapture',cancelAim);
 function bindHold(id:string,key:'left'|'right'|'fire'){
     const button=el(id);
     button.addEventListener('pointerdown',event=>{event.preventDefault();if(blocked())return;button.setPointerCapture(event.pointerId);held[key]=true;if(key==='fire')shoot();else void audio.unlock();});
@@ -295,7 +309,7 @@ function wheelMove(event:PointerEvent){
 }
 wheel.addEventListener('pointerdown',event=>{
     event.preventDefault();if(blocked()||wheelPointer!==null)return;
-    wheelPointer=event.pointerId;turretRoller.reset();wheel.setPointerCapture(event.pointerId);wheelMove(event);void audio.unlock();
+    doubleTap.reset();wheelPointer=event.pointerId;turretRoller.reset();wheel.setPointerCapture(event.pointerId);wheelMove(event);void audio.unlock();
 });
 wheel.addEventListener('pointermove',event=>{if(!blocked()&&wheelPointer===event.pointerId){event.preventDefault();wheelMove(event);}});
 const releaseWheel=(event:PointerEvent)=>{if(wheelPointer===event.pointerId){turretRoller.reset();wheelPointer=null;}};
