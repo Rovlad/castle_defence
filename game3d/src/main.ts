@@ -3,7 +3,7 @@ import { PlayableIntro } from './intro';
 import { droneSoundSources } from './droneAudio';
 import './style.css';
 import { Arena } from './arena';
-import { Siege, DIFFICULTIES, UPGRADE_COSTS, ENCOUNTERS, waveEncounter, type Difficulty, type Upgrade } from './model';
+import { Siege, DIFFICULTIES, UPGRADE_COSTS, ENCOUNTERS, DRONE_ROLES, roleBriefing, waveEncounter, type Difficulty, type Upgrade } from './model';
 import { GameAudio } from './audio';
 import { Radar } from './radar';
 import { AimSmoother, TurretRoller, DoubleTap } from './controls';
@@ -175,6 +175,7 @@ function consumeEvents(){
         if(event.kind==='hit')audio.effect('hit');
         if(event.kind==='kill')audio.effect('explosion');
         if(event.kind==='blast')audio.effect('explosion');
+        if(event.kind==='spawn'&&event.targetKind&&event.targetKind in DRONE_ROLES){const role=DRONE_ROLES[event.targetKind as keyof typeof DRONE_ROLES];toast(`${role.label} incoming · ${event.targetKind==='repair'?'Heals allies':event.targetKind==='shield'?'Protects nearby allies':'Creates radar echoes'}`);}
         if(event.kind==='launch')toast('Carrier deployed a scout · Check radar');
         if(event.kind==='pulse'){audio.effect('clear');toast('Jammer active · drones slowed for 4 seconds');}
         if(event.kind==='breach'){audio.effect('breach');damageUntil=performance.now()+550;toast(`${game.health} castle health remaining`);}
@@ -200,6 +201,7 @@ function consumeEvents(){
             el('nextWaveLabel').textContent=`NEXT MISSION · WAVE ${game.wave+1}`;
             el('nextEncounterTitle').textContent=next.title;
             el('nextEncounter').textContent=next.description;
+            el('droneIntel').textContent=roleBriefing(game.wave+1);el('droneIntel').hidden=!el('droneIntel').textContent;
             resupply.showModal();
         }
         if(event.kind==='lost'&&!intro){

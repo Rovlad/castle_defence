@@ -26,6 +26,16 @@ The pattern repeats every five waves: standard approach, coordinated swarms (gro
 
 Every fifth wave replaces the first normal drone with a slower, larger carrier. Wave 5 has 10 HP; each subsequent boss adds two HP. Its glowing front core takes double direct-shot damage, and it can launch one scout at 8 seconds and another at 16 seconds of flight. Deployed scouts are included in wave progress and must be resolved before resupply. Destroying the carrier awards 100 points; each breach still costs one health. Radar marks carriers with a large square, and the combat banner displays carrier HP. Aim assistance targets the core. Splash damage does not receive the weak-point multiplier.
 
+## Support drone roles
+
+Support roles replace specific normal-wave slots, keeping the base wave count unchanged. Each is previewed in the next-mission briefing and announced on arrival. A green repair drone appears from wave 6 (slot 2), a cyan shield emitter from wave 8 (slot 3), and a violet decoy from wave 10 (slot 4). Bosses remain in slot 1.
+
+- **Repair:** 2 HP, 30 points. Every four combat seconds it restores one HP to one damaged ally within 10m, capped at that ally's maximum. Destroy it to stop repairs. Green cross on hull and radar.
+- **Shield:** 2 HP, 35 points. Protects allies within 8m by absorbing one point of damage per hit, including splash. Three shared charges refresh every six combat seconds. Shield emitters cannot shield themselves or each other; destroy the emitter or exhaust its charges. Cyan emitter, ally envelopes and hexagonal radar marker.
+- **Decoy:** 1 HP, 15 points. Creates two hollow violet radar echoes; these have no hitboxes, rewards, threat alerts or effect on wave counts. Destroy the real violet antenna drone (solid triangle marker) to remove the echoes.
+
+Support abilities pause with combat and stop when their source is gone. Role markers and core silhouettes remain visible in low graphics settings. Prioritize repair and shield drones to break supported formations.
+
 ## Difficulty, points and pause
 
 Choose Easy, Normal, Hard or Suicide before starting. The selection is remembered; restarting retains the selected mode and resets points and upgrades. Drones spawn 65m from the castle (previously 46m), breach at 8m, and the radar scales to the larger approach area.

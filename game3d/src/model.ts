@@ -7,7 +7,7 @@ export const DIFFICULTIES = {
 } as const;
 export type Difficulty = keyof typeof DIFFICULTIES;
 export const UPGRADE_COSTS = { beam: 30, brightness: 40, turn: 40, ammo: 50, damage: 100, velocity: 60, blast: 150, jammer: 120 } as const;
-export const KILL_POINTS = { scout: 10, armored: 20, heavy: 30, boss: 100 } as const;
+export const KILL_POINTS = { scout: 10, armored: 20, heavy: 30, boss: 100, repair:30, shield:35, decoy:15 } as const;
 export const WAVE_BONUS = 20;
 export const FLAWLESS_BONUS = 50;
 export function waveEncounter(wave:number){return wave%5===0?'boss':wave%5===2?'swarm':wave%5===3?'pincer':wave%5===4?'blackout':'standard';}
@@ -22,9 +22,9 @@ export type WaveResult={wave:number;kills:number;shots:number;hits:number;breach
 export type Phase = 'ready' | 'combat' | 'resupply' | 'lost';
 export const UPGRADES = ['beam','brightness','turn','ammo','damage','velocity','blast','jammer'] as const;
 export type Upgrade = typeof UPGRADES[number];
-export type Enemy = { id: number; x: number; y: number; z: number; hp: number; maxHp: number; radius: number; speed: number; kind: 'scout' | 'armored' | 'heavy' | 'boss'; reveal: number; age: number; hitFlash?: number; launches?:number };
+export type Enemy = { id: number; x: number; y: number; z: number; hp: number; maxHp: number; radius: number; speed: number; kind: 'scout' | 'armored' | 'heavy' | 'boss' | 'repair' | 'shield' | 'decoy'; reveal: number; age: number; hitFlash?: number; launches?:number; supportTime?:number; shieldCharge?:number };
 export type Bullet = { id: number; pos: V3; direction: V3; age: number; speed: number; damage: number; blast: number };
-export type GameEvent = { kind: 'spawn' | 'shot' | 'hit' | 'kill' | 'breach' | 'clear' | 'lost' | 'pulse' | 'blast' | 'launch'; id?: number; pos?: V3; hp?: number; targetKind?: Enemy['kind']; weak?:boolean };
+export type GameEvent = { kind: 'spawn' | 'shot' | 'hit' | 'kill' | 'breach' | 'clear' | 'lost' | 'pulse' | 'blast' | 'launch' | 'heal' | 'shield'; id?: number; pos?: V3; hp?: number; targetKind?: Enemy['kind']; weak?:boolean };
 export const STATION: Readonly<V3> = Object.freeze({ x: 0, y: 5.8, z: 0 });
 export const SPAWN_RADIUS = 65;
 export const BREACH_RADIUS = 8;
@@ -59,6 +59,17 @@ export function segmentHit(a: V3, b: V3, center: V3, radius: number): number | n
 export function bossCore(enemy:Enemy):V3 {
     const distance=Math.max(.01,Math.hypot(enemy.x,enemy.z));
     return {x:enemy.x-enemy.x/distance*(enemy.radius-.2),y:enemy.y+.7,z:enemy.z-enemy.z/distance*(enemy.radius-.2)};
+}
+export const DRONE_ROLES={
+    repair:{wave:6,label:'Repair drone',tip:'Green cross: repairs one nearby damaged drone every 4s within 10m. Shoot it first.'},
+    shield:{wave:8,label:'Shield drone',tip:'Cyan emitter: blocks 1 damage per hit to nearby allies within 8m. Three charges recharge every 6s. The emitter is unprotected.'},
+    decoy:{wave:10,label:'Decoy drone',tip:'Violet antenna: creates hollow radar echoes. Destroy the real drone to clear the false contacts.'}
+} as const;
+export function droneRole(wave:number,number:number):Enemy['kind']|null{
+    return wave>=10&&number===4?'decoy':wave>=8&&number===3?'shield':wave>=6&&number===2?'repair':null;
+}
+export function roleBriefing(wave:number){
+    return Object.values(DRONE_ROLES).filter(role=>wave>=role.wave).map(role=>`${role.label}: ${role.tip}`).join(' ');
 }
 export class Siege {
     phase: Phase = 'ready';
@@ -159,7 +170,14 @@ export class Siege {
         if(this.paused||this.phase!=='combat'||!this.jammerOwned||this.jamCooldown>0)return false;
         this.jamRemaining=4;this.jamCooldown=18;this.events.push({kind:'pulse'});return true;
     }
+    shieldFor(enemy:Enemy){
+        if(enemy.kind==='shield')return undefined;
+        return this.enemies.find(source=>source.kind==='shield'&&source.hp>0&&(source.shieldCharge??3)>0&&
+            Math.hypot(source.x-enemy.x,source.y-enemy.y,source.z-enemy.z)<=8);
+    }
     private damageEnemy(enemy:Enemy,amount:number,weak=false) {
+        const shield=this.shieldFor(enemy);
+        if(shield){shield.shieldCharge=(shield.shieldCharge??3)-1;amount=Math.max(0,amount-1);this.events.push({kind:'shield',id:enemy.id,pos:{x:enemy.x,y:enemy.y,z:enemy.z}});}
         enemy.hp=Math.max(0,enemy.hp-amount);enemy.hitFlash=.16;
         const pos={x:enemy.x,y:enemy.y,z:enemy.z};
         this.events.push({kind:'hit',id:enemy.id,pos,hp:enemy.hp,targetKind:enemy.kind,weak});
@@ -189,13 +207,13 @@ export class Siege {
             const angle=this.wave===1&&this.spawned===0?this.yaw:this.encounter==='swarm'?this.waveBearing+(this.random()-.5)*.24:
                 this.encounter==='pincer'?this.waveBearing+(this.spawned%2?Math.PI:0)+(this.random()-.5)*.32:this.random()*Math.PI*2;
             const number = ++this.spawned-this.deployed;
-            const kind = this.encounter==='boss'&&number===1?'boss':this.wave >= 5 && number%3 === 0 ? 'heavy' : this.wave >= 3 && number%2 === 0 ? 'armored' : 'scout';
-            const hp = kind==='boss'?8+2*Math.floor(this.wave/5):kind === 'heavy' ? 3 : kind === 'armored' ? 2 : 1;
+            const kind = this.encounter==='boss'&&number===1?'boss':droneRole(this.wave,number)??(this.wave >= 5 && number%3 === 0 ? 'heavy' : this.wave >= 3 && number%2 === 0 ? 'armored' : 'scout');
+            const hp = kind==='boss'?8+2*Math.floor(this.wave/5):kind === 'heavy' ? 3 : kind === 'armored'||kind==='repair'||kind==='shield' ? 2 : 1;
             const id = ++this.nextId;
             const enemy: Enemy = { id, x:Math.sin(angle)*SPAWN_RADIUS, y:flightHeight(kind,0,id), z:Math.cos(angle)*SPAWN_RADIUS,
                 hp,maxHp:hp,kind,radius:kind==='boss'?2.4:kind==='heavy'?1.35:kind==='armored'?1.05:.95,
                 speed:(2.8+(this.wave-1)*.20)*this.rules.speed*(kind==='boss'?.5:kind==='heavy'?.65:kind==='armored'?.82:1),reveal:0,age:0 };
-            this.enemies.push(enemy);this.spawnElapsed = 0;this.events.push({kind:'spawn',id:enemy.id});
+            this.enemies.push(enemy);this.spawnElapsed = 0;this.events.push({kind:'spawn',id:enemy.id,targetKind:kind});
         }
         const aim = aimDirection(this.yaw,this.pitch);
         for (const enemy of [...this.enemies]) {
@@ -223,6 +241,20 @@ export class Siege {
             const ey = enemy.y-STATION.y, distance = Math.hypot(enemy.x,ey,enemy.z);
             const dot = (enemy.x*aim.x+ey*aim.y+enemy.z*aim.z)/distance;
             enemy.reveal = !this.blackoutActive&&dot >= Math.cos(this.beam/2) ? 1 : Math.max(0,enemy.reveal-dt/.4);
+        }
+        for(const enemy of this.enemies){
+            if(enemy.kind!=='repair'&&enemy.kind!=='shield')continue;
+            enemy.supportTime=(enemy.supportTime||0)+dt;
+            const interval=enemy.kind==='repair'?4:6;
+            if(enemy.supportTime>=interval){
+                enemy.supportTime-=interval;
+                if(enemy.kind==='shield')enemy.shieldCharge=3;
+                else{
+                    const target=this.enemies.filter(ally=>ally.id!==enemy.id&&ally.hp>0&&ally.hp<ally.maxHp&&Math.hypot(ally.x-enemy.x,ally.y-enemy.y,ally.z-enemy.z)<=10)
+                        .sort((a,b)=>(a.hp/a.maxHp)-(b.hp/b.maxHp)||a.id-b.id)[0];
+                    if(target){target.hp=Math.min(target.maxHp,target.hp+1);this.events.push({kind:'heal',id:target.id,pos:{x:target.x,y:target.y,z:target.z}});}
+                }
+            }
         }
         const liveBullets: Bullet[] = [];
         for (const bullet of this.bullets) {

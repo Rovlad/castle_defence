@@ -25,7 +25,7 @@ import { pointSearchlight } from './searchlight';
 export class Arena {
     engine: Engine; scene: Scene; camera: FreeCamera; spotlight: SpotLight;
     private shadow: ShadowGenerator; private weapon: TransformNode; private flash: Mesh; private muzzle: PointLight;
-    private bodies = new Map<number,{root:TransformNode;rotors:Mesh[];meshes:Mesh[];paint:StandardMaterial;cracks:Mesh[];smokeTime:number;details:TransformNode}>();
+    private bodies = new Map<number,{root:TransformNode;rotors:Mesh[];meshes:Mesh[];paint:StandardMaterial;cracks:Mesh[];smokeTime:number;details:TransformNode;field:Mesh}>();
     private rounds = new Map<number,Mesh>();
     private sparks: {mesh:Mesh;velocity:Vector3;life:number;duration:number;kind:'spark'|'smoke'|'debris'|'blast'}[] = [];
     private shotFlash = 0; private recoil = 0;
@@ -33,7 +33,7 @@ export class Arena {
     private details:TransformNode;
     private explosion:PointLight;
     private explosionTime=0;
-    private red:StandardMaterial;private green:StandardMaterial;private steel:StandardMaterial;
+    private violet:StandardMaterial;private shieldField:StandardMaterial;private red:StandardMaterial;private green:StandardMaterial;private steel:StandardMaterial;
     private stone: StandardMaterial; private metal: StandardMaterial; private amber: StandardMaterial;
     private enemyMaterials: Record<string,StandardMaterial>;
     private engineGlow: StandardMaterial;
@@ -49,12 +49,13 @@ export class Arena {
         this.scene.activeCamera = this.camera;
         this.stone = this.material('castle stone','#607681');this.metal = this.material('gun metal','#2b3e47');
         this.amber = this.material('lantern glass','#ecbb66',true);
-        this.enemyMaterials = {scout:this.material('scout drone','#a47862'),armored:this.material('armored drone','#8f9db3'),heavy:this.material('heavy drone','#738e75'),boss:this.material('carrier armor','#9e7966')};
+        this.enemyMaterials = {scout:this.material('scout drone','#a47862'),armored:this.material('armored drone','#8f9db3'),heavy:this.material('heavy drone','#738e75'),boss:this.material('carrier armor','#9e7966'),repair:this.material('repair hull','#579f78'),shield:this.material('shield hull','#509cac'),decoy:this.material('decoy hull','#9472b2')};
         this.engineGlow = this.material('engine glow','#86d8e3',true);
         this.smokeMaterial=this.material('engine smoke','#52616a');this.smokeMaterial.alpha=.45;
         this.soot=this.material('scorched armor','#1b252c');
         this.steel=this.material('brushed steel','#9aafb5');this.steel.specularColor.set(.45,.5,.55);this.steel.specularPower=48;
         this.red=this.material('port navigation','#f45848',true);this.green=this.material('starboard navigation','#64e7b1',true);
+        this.violet=this.material('decoy signal','#bc8aec',true);this.shieldField=this.material('shield field','#74d7ec',true);this.shieldField.alpha=.10;
         this.details=new TransformNode('optional scenery details',this.scene);
         this.explosion=new PointLight('explosion illumination',Vector3.Zero(),this.scene);
         this.explosion.diffuse=new Color3(1,.47,.12);this.explosion.range=18;this.explosion.intensity=0;
@@ -235,21 +236,38 @@ export class Arena {
             core.parent=root;core.position.set(0,.7,-(enemy.radius-.2));core.material=this.red;core.isPickable=false;
             this.box('weak core frame',1.2,.15,.25,this.amber,new Vector3(0,.05,-2.2),root);
         }
+        if(enemy.kind==='repair'){
+            this.box('repair cross horizontal',.8,.08,.22,this.green,new Vector3(0,.34,0),root);
+            this.box('repair cross vertical',.22,.08,.8,this.green,new Vector3(0,.34,0),root);
+            for(const side of [-1,1])this.box('repair supply pack',.25,.3,.65,this.green,new Vector3(side*.52,-.08,0),root);
+        }
+        if(enemy.kind==='shield'){
+            this.cylinder('shield emitter',.45,.4,new Vector3(0,.5,0),this.engineGlow,root);
+            for(const side of [-1,1])this.box('shield capacitor',.2,.35,.7,this.engineGlow,new Vector3(side*.5,0,0),root);
+        }
+        if(enemy.kind==='decoy'){
+            this.box('decoy antenna mast',.06,.8,.06,this.metal,new Vector3(0,.6,0),root);
+            this.box('decoy transmitter',.9,.08,.12,this.violet,new Vector3(0,.98,0),root);
+            this.box('decoy violet stripe',.65,.05,.25,this.violet,new Vector3(0,.3,0),root);
+        }
+        const field=MeshBuilder.CreateSphere('ally shield envelope',{diameter:enemy.radius*2.15,segments:8},this.scene);
+        field.parent=root;field.material=this.shieldField;field.isPickable=false;field.setEnabled(false);
         const cracks:Mesh[]=[];
         for(const side of [-1,1]){
             const crack=this.box('armor crack',.035,.035,.4,this.soot,new Vector3(side*.15,.22,0),root);
             crack.rotation.y=side*.5;crack.setEnabled(false);cracks.push(crack);
         }
-        const meshes=root.getChildMeshes() as Mesh[];meshes.forEach(mesh=>{mesh.isPickable=false;this.shadow.addShadowCaster(mesh);});
-        hull.receiveShadows=true;this.bodies.set(enemy.id,{root,rotors,meshes,paint:mat,cracks,smokeTime:0,details});return this.bodies.get(enemy.id)!;
+        const meshes=root.getChildMeshes() as Mesh[];meshes.forEach(mesh=>{mesh.isPickable=false;if(mesh!==field)this.shadow.addShadowCaster(mesh);});
+        hull.receiveShadows=true;this.bodies.set(enemy.id,{root,rotors,meshes,paint:mat,cracks,smokeTime:0,details,field});return this.bodies.get(enemy.id)!;
     }
-    private effect(pos:Vector3,kind:'spark'|'smoke'|'debris'|'blast',duration:number) {
+    private effect(pos:Vector3,kind:'spark'|'smoke'|'debris'|'blast',duration:number,material?:StandardMaterial) {
         while(this.sparks.length>=(this.lowQuality?64:160)){this.sparks.shift()!.mesh.dispose();}
         const mesh=kind==='smoke'||kind==='blast'?MeshBuilder.CreateSphere(kind,{diameter:kind==='smoke'?.35:.4,segments:6},this.scene):
             MeshBuilder.CreateBox(kind,{size:kind==='debris'?.2:.07},this.scene);
         if(kind==='spark')mesh.scaling.set(.55,.55,3);
         if(kind==='debris')mesh.scaling.set(.8+Math.random(),.4,1.5+Math.random()*2);
         mesh.isPickable=false;mesh.position.copyFrom(pos);mesh.material=kind==='smoke'?this.smokeMaterial:kind==='debris'?this.steel:this.amber;
+        if(material)mesh.material=material;
         const velocity=kind==='smoke'?new Vector3((Math.random()-.5)*.6,1.2,0):kind==='blast'?Vector3.Zero():
             new Vector3((Math.random()-.5)*9,2+Math.random()*5,(Math.random()-.5)*9);
         this.sparks.push({mesh,velocity,life:duration,duration,kind});
@@ -259,6 +277,7 @@ export class Arena {
         if((event.kind==='kill'||event.kind==='blast')&&event.pos&&!this.lowQuality){
             this.explosion.position.set(event.pos.x,event.pos.y,event.pos.z);this.explosionTime=.22;
         }
+        if((event.kind==='heal'||event.kind==='shield')&&event.pos){for(let i=0;i<count(4);i++)this.effect(new Vector3(event.pos.x,event.pos.y,event.pos.z),'spark',.45,event.kind==='heal'?this.green:this.engineGlow);}
         if(event.kind==='shot'){this.shotFlash=.07;this.recoil=.055;}
         if((event.kind==='hit'||event.kind==='breach')&&event.pos) {
             const pos=new Vector3(event.pos.x,event.pos.y,event.pos.z);
@@ -290,6 +309,7 @@ export class Arena {
             body.root.setEnabled(enemy.reveal>0);
             body.meshes.forEach(mesh=>mesh.visibility=enemy.reveal);
             body.rotors.forEach((rotor,index)=>rotor.rotation.y=enemy.age*32*(index%2?1:-1));
+            body.field.setEnabled(!!game.shieldFor(enemy));
             body.paint.emissiveColor.set(1,.35,.05);body.paint.emissiveColor.scaleInPlace((enemy.hitFlash||0)/.16);
             body.cracks.forEach(crack=>crack.setEnabled(enemy.hp<enemy.maxHp));
             body.smokeTime+=dt;
