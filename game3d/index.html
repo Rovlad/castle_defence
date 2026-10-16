@@ -46,6 +46,7 @@
       <li><strong>Earn and spend points.</strong> Scouts give 10, armored drones 20 and heavies 30 points. Clearing a wave adds 20 and repairs one health, up to three. Zero breaches earns a further 50-point flawless bonus.</li>
       <li><strong>Resupply.</strong> Buy upgrades with your points, or save them. After four seconds, press Start next wave. Purchases are optional.</li>
       <li><strong>Special waves.</strong> Swarms, two-front attacks and brief light blackouts vary the challenge. Every fifth wave brings a carrier: hit its glowing front core for double damage and watch for deployed scouts.</li>
+      <li><strong>Support drones.</strong> From wave 6, green repair drones heal allies; from wave 8, cyan shield drones absorb damage for nearby allies; from wave 10, violet decoys create hollow radar echoes. Prioritize support drones to break formations.</li>
       <li><strong>Take a break.</strong> Use the pause button to freeze play. Choose your difficulty below; points and upgrades reset for a new run.</li>
     </ul>
   </details>
@@ -82,7 +83,7 @@
       <div class="debriefStat"><span>COMBAT TIME</span><strong id="resultTime"></strong><small>Resupply excluded</small></div>
     </div>
     <div class="earnedReward"><span>MISSION PAYOUT</span><strong id="resultPoints"></strong><small>POINTS EARNED</small></div>
-    <div class="nextMission"><div class="missionRadar" aria-hidden="true"><i></i></div><div><span class="eyebrow" id="nextWaveLabel"></span><h3 id="nextEncounterTitle"></h3><p id="nextEncounter"></p></div></div>
+    <div class="nextMission"><div class="missionRadar" aria-hidden="true"><i></i></div><div><span class="eyebrow" id="nextWaveLabel"></span><h3 id="nextEncounterTitle"></h3><p id="nextEncounter"></p><p id="droneIntel" hidden></p></div></div>
   </section><h3 class="armoryHeading">REARM YOUR TURRET</h3><div class="upgradeChoices"><button data-upgrade="beam"><b>Wider searchlight</b><small>Reveal more of the darkness.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="beam" role="img"></span><span class="levelCaption" data-level="beam"></span></span><span class="upgradeCondition" data-current="beam"></span><span class="upgradePrice" data-price="beam"></span></button>
     <button data-upgrade="brightness"><b>Brighter searchlight</b><small>+50% starting brightness per level, up to 2.5×.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="brightness" role="img"></span><span class="levelCaption" data-level="brightness"></span></span><span class="upgradeCondition" data-current="brightness"></span><span class="upgradePrice" data-price="brightness"></span></button>
     <button data-upgrade="turn"><b>Faster turret</b><small>Turn and track enemies faster.</small><span class="upgradeMeter"><span class="levelBattery" data-meter="turn" role="img"></span><span class="levelCaption" data-level="turn"></span></span><span class="upgradeCondition" data-current="turn"></span><span class="upgradePrice" data-price="turn"></span></button>

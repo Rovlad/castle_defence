@@ -344,3 +344,28 @@ taps.reset();assert(!taps.tap(200,100,1900),'Reset clears pending tap');
 assert(taps.tap(200,100,2100)&&!taps.tap(200,100,2200),'Successful pairs are consumed');
 console.log('PASS: double-tap timing, spatial tolerance, pair consumption and reset.');
 }
+
+{
+const {droneRole}=await import('./src/model.ts');const {radarEchoes}=await import('./src/radar.ts');
+assert(droneRole(5,2)===null&&droneRole(6,2)==='repair'&&droneRole(8,3)==='shield'&&droneRole(10,4)==='decoy','Support roles unlock gradually');
+const support=(id:number,kind:Enemy['kind'],x:number,z:number):Enemy=>({...target(id,2,x,z),kind,maxHp:2,y:flightHeight(kind,0,id)});
+const repair=new Siege();repair.start();repair.spawned=repair.waveSize;const medic=support(901,'repair',3,25),ally=support(902,'heavy',0,25);ally.hp=1;repair.enemies=[medic,ally];
+advance(repair,3.9);assert(ally.hp===1,'Repairs have a cooldown');advance(repair,.2);assert(ally.hp===2&&repair.drainEvents().some(e=>e.kind==='heal'),'Repair restores one HP to an injured ally');
+advance(repair,4.1);assert(ally.hp===2,'Repair cannot exceed maximum HP');ally.hp=1;ally.x=30;advance(repair,4.1);assert(ally.hp===1,'Repair range is bounded');
+ally.x=0;repair.setPaused(true);const supportTime=medic.supportTime;advance(repair,8);assert(medic.supportTime===supportTime&&ally.hp===1,'Support abilities pause');repair.setPaused(false);repair.enemies=[ally];advance(repair,4.1);assert(ally.hp===1,'Destroyed repair source cannot heal');
+const defended=new Siege();defended.start();defended.spawned=defended.waveSize;const emitter=support(910,'shield',4,20),victim=support(911,'armored',0,20);defended.enemies=[emitter,victim];defended.pitch=Math.atan2(STATION.y-victim.y,20);
+for(let i=0;i<3;i++){defended.cooldown=0;defended.fire();advance(defended,.5);}
+assert(victim.hp===2&&emitter.shieldCharge===0,'Shield absorbs three one-damage shots');
+assert(defended.shieldFor(emitter)===undefined&&defended.shieldFor(victim)===undefined,'Emitter is unprotected and exhausted fields switch off');
+defended.cooldown=0;defended.fire();advance(defended,.5);assert(victim.hp===1,'Exhausted shield allows damage');advance(defended,4.1);assert(emitter.shieldCharge===3&&defended.shieldFor(victim)===emitter,'Shield recharges on combat time');
+emitter.x=30;assert(!defended.shieldFor(victim),'Shield range is bounded');emitter.x=4;defended.enemies=[victim];assert(!defended.shieldFor(victim),'Destroying emitter removes protection');
+const echoes=[support(920,'decoy',20,20)];assert(radarEchoes(echoes).length===2&&echoes.length===1,'Decoy echoes do not add combat enemies');assert(radarEchoes([]).length===0,'Destroying decoy removes false contacts');assert(radarEchoes(echoes).every(e=>Math.hypot(e.x,e.z)<=SPAWN_RADIUS),'Echoes remain inside radar range');
+for(const [kind,number,wave] of [['repair',2,6],['shield',3,8],['decoy',4,10]] as const){const g=new Siege(()=>.2);g.wave=wave;g.start();g.spawned=number-1;g.spawnElapsed=10;g.tick(.025);assert(g.enemies.some(e=>e.kind===kind),'Unlocked support drone actually spawns');}
+defended.enemies=[emitter,victim];victim.hp=victim.maxHp=3;emitter.shieldCharge=3;defended.damage=3;defended.cooldown=0;defended.fire();advance(defended,.5);assert(victim.hp===1,'Strong shots penetrate one point of shield absorption');
+for(const kind of ['repair','shield','decoy'] as const){
+ const g=new Siege();g.start();g.waveSize=999;const e=support(930,kind,0,20);e.hp=1;g.enemies=[e];g.pitch=Math.atan2(STATION.y-e.y,20);g.fire();advance(g,.5);
+ assert(g.kills===1&&g.points===KILL_POINTS[kind]&&g.waveHits===1,'Support drone awards its tier reward exactly once');
+ if(kind==='decoy')assert(radarEchoes(g.enemies).length===0,'Killing a decoy clears actual radar echoes');
+}
+console.log('PASS: support unlocks/spawning, repair cooldown/cap/range/pause/removal, shield depletion/recharge/range/removal and radar-only decoys.');
+}

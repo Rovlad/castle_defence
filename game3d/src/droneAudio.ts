@@ -9,6 +9,6 @@ export function droneSoundSources(enemies: readonly Enemy[], yaw: number) {
             const approach=Math.max(0,Math.min(1,(SPAWN_RADIUS-distance)/(SPAWN_RADIUS-BREACH_RADIUS)));
             return {pan:Math.sin(Math.atan2(enemy.x,enemy.z)-yaw),
                 strength:.16+.84*approach*approach,
-                pitch:enemy.kind==='boss'?85:enemy.kind==='heavy'?105:enemy.kind==='armored'?135:165};
+                pitch:enemy.kind==='repair'?180:enemy.kind==='shield'?125:enemy.kind==='decoy'?210:enemy.kind==='boss'?85:enemy.kind==='heavy'?105:enemy.kind==='armored'?135:165};
         });
 }
